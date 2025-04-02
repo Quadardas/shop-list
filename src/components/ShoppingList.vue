@@ -1,57 +1,75 @@
 <template>
   <div class="container">
     <VaOptionList
-        v-model="selectedProducts"
+        v-model="selectedProductIds"
         :options="products"
         value-by="id"
         :text-by="(product) => `${product.name} (${product.count} шт.)`"
+        @update:modelValue="handleSelectionChange"
     />
-
-    <div>Выбранные продукты:</div>
-    <pre>{{ selectedProducts }}</pre>
+    <va-button class="button" type="submit" @click="deleteAll">Очистить список</va-button>
   </div>
 </template>
 
 <script lang="ts" setup>
-import {ref, onMounted, watch} from 'vue'
-import {VaOptionList} from "vuestic-ui"
-import {dbService} from "@/components/services/DB.service.ts";
+import {ref, onMounted} from 'vue'
+import {VaButton, VaOptionList} from "vuestic-ui"
+import {dbService} from "@/components/services/DB.service.ts"
 import type {IProduct} from "@/models/product.model.ts"
 
-const products = ref<any[]>([])
-const selectedProducts = ref<IProduct[]>([])
+const products = ref<IProduct[]>([])
+const selectedProductIds = ref<number[]>([])
 
-function updateSelectedProducts(id: number) {
-  // console.log(selectedProducts.value)
+function deleteAll() {
+  dbService.deleteAll()
+}
+
+const handleSelectionChange = async (selectedIds: number[]) => {
+  try {
+    await Promise.all(products.value.map(async (product) => {
+      const shouldBeBought = selectedIds.includes(product.id)
+
+      if (product.bought !== shouldBeBought) {
+        const updatedProduct = {...product, bought: shouldBeBought}
+        await dbService.updateProduct(updatedProduct)
+
+        product.bought = shouldBeBought
+      }
+    }))
+  } catch (error) {
+    console.error("Ошибка при обновлении продуктов:", error)
+  }
 }
 
 onMounted(async () => {
   try {
-    await dbService.getAllProducts()
-
     const existingProducts = await dbService.getAllProducts()
+
     if (existingProducts.length === 0) {
       await dbService.addProduct({id: 1, name: 'Молоко', count: 15, bought: false})
       await dbService.addProduct({id: 2, name: 'Хлеб', count: 20, bought: false})
       await dbService.addProduct({id: 3, name: 'Яйца', count: 30, bought: false})
+      products.value = await dbService.getAllProducts()
+    } else {
+      products.value = existingProducts
+      selectedProductIds.value = existingProducts
+          .filter(p => p.bought)
+          .map(p => p.id)
     }
-
-    products.value = await dbService.getAllProducts()
   } catch (error) {
     console.error("Ошибка при работе с IndexedDB:", error)
   }
 })
-
-watch(selectedProducts, (product) => {
-  console.log(selectedProducts.value)
-})
-
-// selectedProducts.value = await dbService.updateProducts(selectedProducts.value)
 </script>
 
 <style lang="scss" scoped>
 .container {
-  margin: 10px;
-  padding: 10px;
+  margin: 20px;
+
+  .button {
+    margin: 10px;
+  }
 }
+
+
 </style>

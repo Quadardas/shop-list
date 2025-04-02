@@ -15,9 +15,9 @@
       <VaNavbarItem class="hidden sm:block">
         Список всех покупок
       </VaNavbarItem>
-      <VaNavbarItem class="hidden sm:block">
-        Добавить продукты
-      </VaNavbarItem>
+      <add-product-modal
+          
+      ></add-product-modal>
 
     </template>
   </VaNavbar>
@@ -25,6 +25,9 @@
 
 </template>
 <script lang="ts" setup>
+import {VaNavbar, VaNavbarItem} from "vuestic-ui";
+import AddProductModal from "@/components/modals/AddProductModal.vue";
+
 </script>
 
 <style lang="scss" scoped>
