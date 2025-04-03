@@ -4,72 +4,146 @@
   </VaButton>
 
   <VaModal
+      no-dismiss
       v-model="showModal"
-      no-outside-dismiss
+      hideDefaultActions
       ok-text="Добавить"
-
+      @ok="handleSubmit"
       cancel-text="Отмена"
+      @cancel="resetForm"
   >
-    <h3 class="va-h3">
-      <VaSelect
-          autocomplete
-          v-model:search="autoCompleteSearchValue"
-          v-model="selectedProduct"
-          :options="products"
-          value-by="id"
-          text-by="name"
-          allow-create
-          @create-new="handleNewProduct"
-          label="Продукт"
-      />
+    <div class="container">
+      <div class="input-container">
+        <VaInput
+            v-model="newProductName"
+            placeholder="Введите название нового продукта"
+            label="Новый продукт"
+
+        />
+
+        <VaSelect
+            v-model="selectedProductId"
+            clearable
+            :options="products"
+            value-by="id"
+            text-by="name"
+            label="или выберите из списка"
+
+        />
+      </div>
       <VaCounter
-          v-model="count"
+          v-model="quantity"
           label="Количество"
           manual-input
+          :min="1"
       />
-    </h3>
+    </div>
+    <div class="btn-container">
+      <VaButton
+          preset="secondary"
+          @click="()=>{
+            resetForm();
+            showModal=false
+          }">
+        Отмена
+      </VaButton>
+      <VaButton @click="handleSubmit">
+        Добавить продукты
+      </VaButton>
+    </div>
+
   </VaModal>
 </template>
 
 <script lang="ts" setup>
-import {onMounted, reactive, ref} from "vue";
-import {VaButton, VaCounter, VaForm, VaModal, VaSelect} from 'vuestic-ui';
+import {onMounted, ref} from "vue";
+import {VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
+import {useProductsStore} from "@/stores/products.ts";
 
 const showModal = ref(false);
-
 const products = ref<IProduct[]>([]);
-const count = ref(1);
-const autoCompleteSearchValue = ref('');
-// const selectedProduct = ref<string | null>(null);
-const selectedProduct = ref<number | null>();
+const quantity = ref(1);
+const newProductName = ref('');
+const selectedProductId = ref<number | null>(null);
+const productsStore = useProductsStore();
 
-// const newProducts = ref<{ value: string; text: string }[]>([]);
+const handleSubmit = async () => {
+  if (!newProductName.value && !selectedProductId.value) {
+    return;
+  }
 
-const handleNewProduct = async (newProductName: string) => {
+  let productToAdd: IProduct;
 
-  const newProduct: IProduct = {
-    id: 0,
-    name: newProductName,
-    count: count.value,
-    bought: false
-  };
+  if (selectedProductId.value) {
+    const existingProduct = products.value.find(p => p.id === selectedProductId.value);
+    if (!existingProduct) return;
 
-  products.value.push(newProduct);
-  selectedProduct.value = newProduct.id;
+    productToAdd = {
+      ...existingProduct,
+      count: quantity.value
+    };
+  } else {
+    productToAdd = {
+      id: 0,
+      name: newProductName.value,
+      count: quantity.value,
+      bought: false
+    };
+  }
 
-  await dbService.addProduct(newProduct);
-  console.log(newProduct);
+  try {
+    await dbService.addProduct(productToAdd);
+    products.value = await dbService.getAllProductsForSelect();
+    resetForm();
+    // showModal.value = false;
+  } catch (error) {
+    console.error("Ошибка при добавлении продукта:", error);
+  }
 };
 
 
-onMounted(async () => {
+const resetForm = () => {
+  newProductName.value = '';
+  selectedProductId.value = null;
+  quantity.value = 1;
+
+};
+
+async function updateAll() {
   products.value = await dbService.getAllProductsForSelect();
-  // newProducts.value = products.value.map(product => ({
-  //   value: String(product.id),
-  //   text: product.name
-  // }));
-  // console.log(newProducts.value);
+
+}
+
+onMounted(async () => {
+  await updateAll();
 });
 </script>
+
+<style lang="scss" scoped>
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  .divider {
+    text-align: center;
+    color: var(--va-secondary);
+    font-weight: bold;
+    margin: 8px 0;
+  }
+}
+
+.btn-container {
+  display: flex;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+</style>

@@ -19,6 +19,7 @@ class DBService {
         if (!db.objectStoreNames.contains(this.secondStoreName)) {
           db.createObjectStore(this.secondStoreName, {keyPath: 'id'});
         }
+
       };
 
       openRequest.onsuccess = () => {
@@ -96,62 +97,108 @@ class DBService {
   public async addProduct(product: IProduct): Promise<void> {
     if (!this.db) await this.initDB();
 
-    const transaction = this.db.transaction(
-      [this.storeName, this.secondStoreName],
-      "readwrite"
-    );
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        const transaction = this.db.transaction(
+          [this.storeName, this.secondStoreName],
+          "readwrite"
+        );
 
-    const shopList = transaction.objectStore(this.storeName);
-    const productStore = transaction.objectStore(this.secondStoreName);
-
-    let existingProduct: IProduct | undefined;
-    if (product.id) {
-      existingProduct = await new Promise<IProduct | undefined>((resolve) => {
-        const request = productStore.get(product.id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => resolve(undefined);
-      });
-    }
-
-    if (!existingProduct) {
-      const newProductId = product.id || Date.now();
+        const shopList = transaction.objectStore(this.storeName);
+        const productStore = transaction.objectStore(this.secondStoreName);
 
 
-      const productForSecondStore = {
-        id: newProductId,
-        name: product.name
-      };
-      productStore.put(productForSecondStore);
+        let productId = product.id && product.id !== 0 ? product.id : Date.now();
 
-      const productForFirstStore = {
-        id: newProductId,
-        count: product.count,
-        bought: product.bought || false
-      };
-      shopList.put(productForFirstStore);
-    } else {
-      const existingShopItem = await new Promise<any>((resolve) => {
-        const request = shopList.get(existingProduct!.id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => resolve(undefined);
-      });
+        let existingProduct: IProduct | undefined = undefined;
 
-      if (existingShopItem.name === product.name) {
-        existingShopItem.count += product.count;
-        shopList.put(existingShopItem);
-      } else {
-        shopList.put({
-          id: existingProduct.id,
-          count: product.count,
-          bought: product.bought || false
+        if (!product.id || product.id === 0) {
+
+          const request = productStore.getAll();
+          const allProducts = await new Promise<IProduct[]>((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+
+          existingProduct = allProducts.find(p => p.name === product.name);
+        } else {
+          const request = productStore.get(product.id);
+          existingProduct = await new Promise<IProduct | undefined>((resolve) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => resolve(undefined);
+          });
+        }
+
+        if (!existingProduct) {
+          await new Promise<void>((res, rej) => {
+            const request = productStore.put({
+              id: productId,
+              name: product.name
+            });
+            request.onsuccess = () => res();
+            request.onerror = () => rej(request.error);
+          });
+        } else {
+          productId = existingProduct.id;
+        }
+
+        const existingShopItem = await new Promise<any>((resolve) => {
+          const request = shopList.get(productId);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => resolve(undefined);
         });
-      }
-    }
 
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = (event) => reject((event.target as IDBRequest).error);
+        if (existingShopItem) {
+          existingShopItem.count += product.count;
+          existingShopItem.bought = product.bought || existingShopItem.bought;
+
+          await new Promise<void>((res, rej) => {
+            const request = shopList.put(existingShopItem);
+            request.onsuccess = () => res();
+            request.onerror = () => rej(request.error);
+          });
+        } else {
+          await new Promise<void>((res, rej) => {
+            const request = shopList.put({
+              id: productId,
+              count: product.count,
+              bought: product.bought || false
+            });
+            request.onsuccess = () => res();
+            request.onerror = () => rej(request.error);
+          });
+        }
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = (event) => reject((event.target as IDBRequest).error);
+      } catch (error) {
+        reject(error);
+      }
     });
+  }
+
+  public async saveAllProducts(products: IProduct[]): Promise<void> {
+    if (!this.db) await this.initDB();
+    const transaction = this.db!.transaction(this.storeName, "readwrite");
+    const shopList = transaction.objectStore(this.storeName);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const clearRequest = shopList.clear();
+        clearRequest.onsuccess = () => resolve();
+        clearRequest.onerror = () => reject(clearRequest.error);
+      });
+
+      await Promise.all(products.map(product => {
+        return new Promise<void>((resolve, reject) => {
+          const request = shopList.put(product);
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+      }));
+    } catch (error) {
+      console.error('Ошибка при сохранении продуктов:', error);
+      throw error;
+    }
   }
 
   public async updateProduct(product: IProduct): Promise<void> {
@@ -165,7 +212,7 @@ class DBService {
         count: product.count,
         bought: product.bought || false
       };
-      shopList.put(productForFirstStore);
+      // shopList.put(productForFirstStore);
       const request = shopList.put(productForFirstStore);
 
       request.onsuccess = () => resolve();
@@ -181,6 +228,7 @@ class DBService {
         .objectStore(this.storeName).clear();
     });
   }
+
 }
 
 
