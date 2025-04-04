@@ -21,27 +21,28 @@ export const useProductsStore = defineStore('products', {
       }
     },
 
-    // async addProduct(product: IProduct) {
-    //   const existing = this.activeProducts.find(p => p.id === product.id);
-    //   if (existing) {
-    //     existing.count += product.count;
-    //   } else {
-    //     this.activeProducts.push({
-    //       ...product,
-    //       id: product.id || Date.now()
-    //     });
-    //   }
-    //
-    //   this.syncWithDB();
-    // },
+    async addProduct(product: IProduct) {
+      const existing = this.activeProducts.find(p => p.id === product.id);
+      if (existing) {
+        existing.count += product.count;
+      } else {
+        this.activeProducts.push({
+          ...product,
+          id: product.id || Date.now()
+        });
+      }
+
+      this.syncWithDB();
+    },
 
     async syncWithDB() {
       if (this.isSyncing) return;
 
       try {
         this.isSyncing = true;
-        console.log("jija", this.activeProducts);
-        await dbService.saveAllProducts(this.activeProducts);
+        // console.log("jija", this.activeProducts);
+        const jija = JSON.parse(JSON.stringify(this.activeProducts));
+        await dbService.saveAllProducts(jija);
       } catch (error) {
         console.error('Ошибка синхронизации:', error);
       } finally {

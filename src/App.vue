@@ -1,6 +1,8 @@
 <template>
   <nav-bar/>
-  <shopping-list/>
+  <div class="content">
+    <router-view/>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -10,6 +12,7 @@ import ShoppingList from "@/components/ShoppingList.vue";
 import {onMounted, onUnmounted, ref} from "vue";
 import {useProductsStore} from '@/stores/products.ts';
 import {dbService} from "@/components/services/DB.service.ts";
+import ProductList from "@/components/ProductList.vue";
 
 const productsStore = useProductsStore();
 const syncInterval = ref<number>();
@@ -19,12 +22,12 @@ const startSyncTimer = () => {
     if (!productsStore.isSyncing) {
       try {
         await productsStore.syncWithDB();
-        console.log(productsStore.activeProducts);
+        // console.log(productsStore.activeProducts);
       } catch (error) {
         console.error('Sync error:', error);
       }
     }
-  }, 10000);
+  }, 5000);
 }
 
 onMounted(async () => {

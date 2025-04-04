@@ -1,18 +1,21 @@
 <template>
   <div class="container">
     <VaOptionList
+        class="option-list"
         v-model="selectedProductIds"
         :options="productsStore.activeProducts"
         value-by="id"
         :text-by="(product) => `${product.name} (${product.count} шт.)`"
         @update:modelValue="handleSelectionChange"
     />
-    <va-button class="button" type="submit" @click="deleteAll">Очистить список</va-button>
+    <va-button v-if="productsStore.activeProducts.length" class="button" type="submit" @click="deleteAll">Очистить
+      список
+    </va-button>
   </div>
 </template>
 
 <script lang="ts" setup>
-import {ref, onMounted} from 'vue'
+import {ref, onMounted, watch} from 'vue'
 import {VaButton, VaOptionList} from "vuestic-ui"
 import {dbService} from "@/components/services/DB.service.ts"
 import type {IProduct} from "@/models/product.model.ts"
@@ -23,14 +26,18 @@ const selectedProductIds = ref<number[]>([])
 const productsStore = useProductsStore()
 
 function deleteAll() {
-  dbService.deleteAll()
+  productsStore.activeProducts = []
+  // dbService.deleteAll()
 }
 
 const handleSelectionChange = (selectedIds: number[]) => {
 
-  productsStore.activeProducts.forEach(product => {
-    product.bought = selectedIds.includes(product.id)
-  })
+  const updatedProducts = productsStore.activeProducts.map(product => ({
+    ...product,
+    bought: selectedIds.includes(product.id)
+  }));
+
+  productsStore.activeProducts = updatedProducts;
 }
 // const handleSelectionChange = async (selectedIds: number[]) => {
 //   try {
@@ -51,11 +58,24 @@ const handleSelectionChange = (selectedIds: number[]) => {
 //   }
 // }
 
+watch(
+    () => productsStore.activeProducts,
+    (newProducts) => {
+      selectedProductIds.value = newProducts
+          .filter(p => p.bought)
+          .map(p => p.id)
+    },
+    {immediate: true, deep: true}
+)
+
 onMounted(async () => {
+  // await productsStore.loadFromDB();
+
   selectedProductIds.value = productsStore.activeProducts
       .filter(p => p.bought)
       .map(p => p.id)
 })
+
 // onMounted(async () => {
 //   try {
 //     const existingProducts = await dbService.getAllProducts()
@@ -80,6 +100,7 @@ onMounted(async () => {
 <style lang="scss" scoped>
 .container {
   margin: 20px;
+
 
   .button {
     margin: 10px;

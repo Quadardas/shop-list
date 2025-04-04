@@ -75,7 +75,6 @@ const handleSubmit = async () => {
   }
 
   let productToAdd: IProduct;
-
   if (selectedProductId.value) {
     const existingProduct = products.value.find(p => p.id === selectedProductId.value);
     if (!existingProduct) return;
@@ -86,7 +85,7 @@ const handleSubmit = async () => {
     };
   } else {
     productToAdd = {
-      id: 0,
+      id: Date.now(),
       name: newProductName.value,
       count: quantity.value,
       bought: false
@@ -94,6 +93,7 @@ const handleSubmit = async () => {
   }
 
   try {
+    productsStore.addProduct(productToAdd);
     await dbService.addProduct(productToAdd);
     products.value = await dbService.getAllProductsForSelect();
     resetForm();

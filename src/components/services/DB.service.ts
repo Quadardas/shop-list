@@ -15,6 +15,8 @@ class DBService {
         const db = openRequest.result;
         if (!db.objectStoreNames.contains(this.storeName)) {
           db.createObjectStore(this.storeName, {keyPath: 'id'});
+
+
         }
         if (!db.objectStoreNames.contains(this.secondStoreName)) {
           db.createObjectStore(this.secondStoreName, {keyPath: 'id'});
@@ -103,13 +105,10 @@ class DBService {
           [this.storeName, this.secondStoreName],
           "readwrite"
         );
-
         const shopList = transaction.objectStore(this.storeName);
         const productStore = transaction.objectStore(this.secondStoreName);
 
-
         let productId = product.id && product.id !== 0 ? product.id : Date.now();
-
         let existingProduct: IProduct | undefined = undefined;
 
         if (!product.id || product.id === 0) {
@@ -219,6 +218,21 @@ class DBService {
       request.onerror = () => reject(request.error);
     });
   }
+
+  public async deleteOneProduct(id: number): Promise<void> {
+    if (!this.db) await this.initDB();
+    console.log(id)
+    return new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.secondStoreName, "readwrite");
+      const store = transaction.objectStore(this.secondStoreName);
+      console.log("Удаляем продукт с id:", id, "и тип:", typeof id);
+      const request = store.delete(id);
+      console.log(request);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
 
   public async deleteAll(): Promise<void> {
     if (!this.db) await this.initDB();
