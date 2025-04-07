@@ -9,17 +9,18 @@
         :text-by="(product) => `${product.name} (${product.count} шт.)`"
         @update:modelValue="handleSelectionChange"
     />
-    <add-product-modal
-    ></add-product-modal>
-    <va-button
-        v-if="productsStore.activeProducts.length"
-        class="button"
-        preset="secondary"
-        type="submit"
-        @click="deleteAll">Очистить
-      список
-    </va-button>
-
+    <div class="btn-container">
+      <add-product-modal
+      ></add-product-modal>
+      <va-button
+          v-if="productsStore.activeProducts.length"
+          class="button"
+          preset="secondary"
+          type="submit"
+          @click="deleteAll">Очистить
+        список
+      </va-button>
+    </div>
   </div>
 </template>
 
@@ -70,13 +71,14 @@ onMounted(async () => {
 .container {
   margin: 20px;
 
+  .btn-container {
+    margin-top: 20px;
 
-  .button {
-    margin-top: 10px;
-    width: 170px
+    .button {
+      margin-top: 10px;
+      width: 170px
 
+    }
   }
 }
-
-
 </style>
