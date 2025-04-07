@@ -200,24 +200,24 @@ class DBService {
     }
   }
 
-  public async updateProduct(product: IProduct): Promise<void> {
-    if (!this.db) await this.initDB();
-
-    return new Promise<void>((resolve, reject) => {
-      const transaction = this.db!.transaction(this.storeName, "readwrite");
-      const shopList = transaction.objectStore(this.storeName);
-      const productForFirstStore = {
-        id: product.id,
-        count: product.count,
-        bought: product.bought || false
-      };
-      // shopList.put(productForFirstStore);
-      const request = shopList.put(productForFirstStore);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
+  // public async updateProduct(product: IProduct): Promise<void> {
+  //   if (!this.db) await this.initDB();
+  //
+  //   return new Promise<void>((resolve, reject) => {
+  //     const transaction = this.db!.transaction(this.storeName, "readwrite");
+  //     const shopList = transaction.objectStore(this.storeName);
+  //     const productForFirstStore = {
+  //       id: product.id,
+  //       count: product.count,
+  //       bought: product.bought || false
+  //     };
+  //     // shopList.put(productForFirstStore);
+  //     const request = shopList.put(productForFirstStore);
+  //
+  //     request.onsuccess = () => resolve();
+  //     request.onerror = () => reject(request.error);
+  //   });
+  // }
 
   public async deleteOneProduct(id: number): Promise<void> {
     if (!this.db) await this.initDB();
@@ -234,14 +234,14 @@ class DBService {
   }
 
 
-  public async deleteAll(): Promise<void> {
-    if (!this.db) await this.initDB();
-    return new Promise<void>((resolve, reject) => {
-      const transaction = this.db!
-        .transaction(this.storeName, "readwrite")
-        .objectStore(this.storeName).clear();
-    });
-  }
+  // public async deleteAll(): Promise<void> {
+  //   if (!this.db) await this.initDB();
+  //   return new Promise<void>((resolve, reject) => {
+  //     const transaction = this.db!
+  //       .transaction(this.storeName, "readwrite")
+  //       .objectStore(this.storeName).clear();
+  //   });
+  // }
 
 }
 

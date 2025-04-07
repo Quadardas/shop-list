@@ -40,7 +40,6 @@ export const useProductsStore = defineStore('products', {
 
       try {
         this.isSyncing = true;
-        // console.log("jija", this.activeProducts);
         const jija = JSON.parse(JSON.stringify(this.activeProducts));
         await dbService.saveAllProducts(jija);
       } catch (error) {

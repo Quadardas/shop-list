@@ -90,6 +90,7 @@ const handleSubmit = async () => {
       count: quantity.value,
       bought: false
     };
+    await updateAll()
   }
 
   try {
