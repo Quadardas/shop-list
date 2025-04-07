@@ -1,4 +1,6 @@
 import type {IProduct} from "@/models/product.model.ts"
+import {useToast} from "vuestic-ui";
+
 
 class DBService {
   private db: IDBDatabase | null = null;
@@ -6,6 +8,7 @@ class DBService {
   private readonly storeName = "shopList";
   private readonly secondStoreName = "allProducts";
   private readonly dbVersion = 3;
+  public notify = useToast()
 
   public async initDB(): Promise<IDBDatabase> {
     return new Promise<IDBDatabase>((resolve, reject) => {
@@ -34,7 +37,7 @@ class DBService {
       };
     });
   }
-  
+
   public async getAllProducts(): Promise<IProduct[]> {
     if (!this.db) await this.initDB();
 
@@ -195,6 +198,7 @@ class DBService {
     } catch (error) {
       console.error('Ошибка при сохранении продуктов:', error);
       throw error;
+      
     }
   }
 

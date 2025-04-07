@@ -8,22 +8,25 @@
       v-model="showModal"
       hideDefaultActions
       ok-text="Добавить"
-      @ok="handleSubmit"
+
       cancel-text="Отмена"
       @cancel="resetForm"
   >
     <div class="container">
       <div class="input-container">
         <VaInput
-            v-model="newProductName"
+            v-model="maskedValue"
             placeholder="Введите название нового продукта"
             label="Новый продукт"
-
+            maxlength="10"
+            strict-bind-input-value
+            :rules="[(value) => value.length <= 20 || 'Макс. 20 символов']"
         />
 
         <VaSelect
             v-model="selectedProductId"
             clearable
+            searchable
             :options="products"
             value-by="id"
             text-by="name"
@@ -56,11 +59,13 @@
 </template>
 
 <script lang="ts" setup>
-import {onMounted, ref} from "vue";
-import {VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
+import {computed, onMounted, ref} from "vue";
+import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
+
+const {init, notify, close, closeAll} = useToast()
 
 const showModal = ref(false);
 const products = ref<IProduct[]>([]);
@@ -68,9 +73,18 @@ const quantity = ref(1);
 const newProductName = ref('');
 const selectedProductId = ref<number | null>(null);
 const productsStore = useProductsStore();
+const maskedValue = computed({
+  get() {
+    return newProductName.value
+  },
+  set(v) {
+    newProductName.value = v.slice(0, 20)
+  }
+})
 
 const handleSubmit = async () => {
-  if (!newProductName.value && !selectedProductId.value) {
+  if (!maskedValue.value && !selectedProductId.value) {
+    notify({message: 'Введите название или выберите из списка', color: 'warning'});
     return;
   }
 
@@ -86,7 +100,7 @@ const handleSubmit = async () => {
   } else {
     productToAdd = {
       id: Date.now(),
-      name: newProductName.value,
+      name: maskedValue.value,
       count: quantity.value,
       bought: false
     };
@@ -98,9 +112,11 @@ const handleSubmit = async () => {
     await dbService.addProduct(productToAdd);
     products.value = await dbService.getAllProductsForSelect();
     resetForm();
+    notify({message: 'Добавлено успешно', color: "success"});
     // showModal.value = false;
   } catch (error) {
     console.error("Ошибка при добавлении продукта:", error);
+    notify({message: 'Ошибка при добавлении продукта'})
   }
 };
 
@@ -109,12 +125,10 @@ const resetForm = () => {
   newProductName.value = '';
   selectedProductId.value = null;
   quantity.value = 1;
-
 };
 
 async function updateAll() {
   products.value = await dbService.getAllProductsForSelect();
-
 }
 
 onMounted(async () => {
