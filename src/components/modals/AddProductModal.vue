@@ -34,12 +34,26 @@
 
         />
       </div>
-      <VaCounter
-          v-model="quantity"
-          label="Количество"
-          manual-input
-          :min="1"
-      />
+      <div class="count-container">
+        <VaCounter
+            v-model="quantity"
+            label="Количество"
+            manual-input
+            :min="1"
+        />
+        <VaSelect
+            v-model="selectedUnitId"
+            label="Единицы измерения"
+            :options="units"
+            value-by="id"
+            text-by="name"
+            allow-create="unique"
+            clearable
+            @create-new="addNewUnit"
+        />
+
+      </div>
+
     </div>
     <div class="btn-container">
       <VaButton
@@ -64,14 +78,17 @@ import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
+import type {IUnit} from "@/models/unit.model.ts";
 
 const {init, notify, close, closeAll} = useToast()
 
 const showModal = ref(false);
 const products = ref<IProduct[]>([]);
+const units = ref<IUnit[]>([]);
 const quantity = ref(1);
 const newProductName = ref('');
 const selectedProductId = ref<number | null>(null);
+const selectedUnitId = ref<number | null>(null);
 const productsStore = useProductsStore();
 const maskedValue = computed({
   get() {
@@ -81,6 +98,18 @@ const maskedValue = computed({
     newProductName.value = v.slice(0, 20)
   }
 })
+
+
+const addNewUnit = async (newUnitName: string) => {
+  const unitToAdd = {
+    id: Date.now(),
+    name: newUnitName,
+  };
+
+  await dbService.addUnit(unitToAdd);
+  units.value = [...units.value, unitToAdd];
+  selectedUnitId.value = unitToAdd.id;
+};
 
 const handleSubmit = async () => {
   if (!maskedValue.value && !selectedProductId.value) {
@@ -102,7 +131,8 @@ const handleSubmit = async () => {
       id: Date.now(),
       name: maskedValue.value,
       count: quantity.value,
-      bought: false
+      bought: false,
+      unit: selectedUnitId.value
     };
     await updateAll()
   }
@@ -129,6 +159,8 @@ const resetForm = () => {
 
 async function updateAll() {
   products.value = await dbService.getAllProductsForSelect();
+  units.value = await dbService.getAllUnits();
+  // console.log(units.value);
 }
 
 onMounted(async () => {
@@ -143,13 +175,6 @@ onMounted(async () => {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 16px;
-
-  .divider {
-    text-align: center;
-    color: var(--va-secondary);
-    font-weight: bold;
-    margin: 8px 0;
-  }
 }
 
 .btn-container {
@@ -160,5 +185,10 @@ onMounted(async () => {
 
 .mb-4 {
   margin-bottom: 1rem;
+}
+
+.count-container {
+  display: flex;
+  gap: 10px;
 }
 </style>

@@ -1,5 +1,6 @@
 import type {IProduct} from "@/models/product.model.ts"
 import {useToast} from "vuestic-ui";
+import type {IUnit} from "@/models/unit.model.ts";
 
 
 class DBService {
@@ -7,8 +8,9 @@ class DBService {
   private readonly dbName = "shoppingDB";
   private readonly storeName = "shopList";
   private readonly secondStoreName = "allProducts";
-  private readonly dbVersion = 3;
-  public notify = useToast()
+  private readonly unitsStoreName = "units";
+  private readonly dbVersion = 4;
+
 
   public async initDB(): Promise<IDBDatabase> {
     return new Promise<IDBDatabase>((resolve, reject) => {
@@ -18,13 +20,13 @@ class DBService {
         const db = openRequest.result;
         if (!db.objectStoreNames.contains(this.storeName)) {
           db.createObjectStore(this.storeName, {keyPath: 'id'});
-
-
         }
         if (!db.objectStoreNames.contains(this.secondStoreName)) {
           db.createObjectStore(this.secondStoreName, {keyPath: 'id'});
         }
-
+        if (!db.objectStoreNames.contains(this.unitsStoreName)) {
+          db.createObjectStore(this.unitsStoreName, {keyPath: 'name'});
+        }
       };
 
       openRequest.onsuccess = () => {
@@ -133,7 +135,8 @@ class DBService {
           await new Promise<void>((res, rej) => {
             const request = productStore.put({
               id: productId,
-              name: product.name
+              name: product.name,
+              unit: product.unit,
             });
             request.onsuccess = () => res();
             request.onerror = () => rej(request.error);
@@ -153,7 +156,12 @@ class DBService {
           existingShopItem.bought = product.bought || existingShopItem.bought;
 
           await new Promise<void>((res, rej) => {
-            const request = shopList.put(existingShopItem);
+            const request = shopList.put({
+              id: existingShopItem.id,
+              name: existingShopItem.name,
+              count: existingShopItem.count,
+              bought: existingShopItem.bought,
+            });
             request.onsuccess = () => res();
             request.onerror = () => rej(request.error);
           });
@@ -161,6 +169,7 @@ class DBService {
           await new Promise<void>((res, rej) => {
             const request = shopList.put({
               id: productId,
+              name: product.name,
               count: product.count,
               bought: product.bought || false
             });
@@ -198,7 +207,7 @@ class DBService {
     } catch (error) {
       console.error('Ошибка при сохранении продуктов:', error);
       throw error;
-      
+
     }
   }
 
@@ -215,6 +224,34 @@ class DBService {
       request.onerror = () => reject(request.error);
     });
   }
+
+  public async getAllUnits(): Promise<IUnit[]> {
+    if (!this.db) await this.initDB();
+
+    return new Promise<IUnit[]>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.unitsStoreName, "readonly");
+      const store = transaction.objectStore(this.unitsStoreName);
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+
+  public async addUnit(unit: IUnit): Promise<void> {
+    if (!this.db) await this.initDB();
+
+    return new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.unitsStoreName, "readwrite");
+      const store = transaction.objectStore(this.unitsStoreName);
+      const request = store.put(unit);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
 
 }
 

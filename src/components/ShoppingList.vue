@@ -5,7 +5,7 @@
         v-model="selectedProductIds"
         :options="productsStore.activeProducts"
         value-by="id"
-        :text-by="(product) => `${product.name} (${product.count} шт.)`"
+        :text-by="(product) => getProductText(product)"
         @update:modelValue="handleSelectionChange"
     />
     <div class="btn-container">
@@ -33,11 +33,13 @@ import {VaButton, VaOptionList, useToast} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
+import {dbService} from "@/components/services/DB.service.ts";
 
 const selectedProductIds = ref<number[]>([])
 const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const toast = useToast()
+const units = ref<Record<number, string>>({})
 
 function showDeleteConfirmation() {
   confirmModal.value?.show()
@@ -51,6 +53,11 @@ function deleteAll() {
   } catch (error) {
     toast.init({message: 'Ошибка при очистке списка', color: 'danger'})
   }
+}
+
+const getProductText = (product: any) => {
+  const unitName = units.value[product.unit] || 'ед.'
+  return `${product.name} (${product.count} ${unitName})`
 }
 
 const handleSelectionChange = (selectedIds: number[]) => {
@@ -93,7 +100,7 @@ onMounted(async () => {
   }
 
   .btn-container {
-    
+
 
     .button {
       margin-top: 10px;
