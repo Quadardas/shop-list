@@ -8,7 +8,6 @@
       v-model="showModal"
       hideDefaultActions
       ok-text="Добавить"
-
       cancel-text="Отмена"
       @cancel="resetForm"
   >
@@ -73,7 +72,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, onMounted, ref} from "vue";
+import {computed, onMounted, ref, watch} from "vue";
 import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
@@ -113,40 +112,47 @@ const addNewUnit = async (newUnitName: string) => {
 
 const handleSubmit = async () => {
   if (!maskedValue.value && !selectedProductId.value) {
-    notify({message: 'Введите название или выберите из списка', color: 'warning'});
+    notify({message: 'Введите название или выберите из списка', color: 'danger'});
+    return;
+  }
+  if (selectedUnitId.value == null) {
+    notify({message: 'Введите единицу измерения', color: 'danger'})
     return;
   }
 
   let productToAdd: IProduct;
+
   if (selectedProductId.value) {
     const existingProduct = products.value.find(p => p.id === selectedProductId.value);
     if (!existingProduct) return;
 
     productToAdd = {
       ...existingProduct,
-      count: quantity.value
+      count: quantity.value,
     };
   } else {
+    const unitObj = units.value.find(u => u.id === selectedUnitId.value);
+
     productToAdd = {
       id: Date.now(),
       name: maskedValue.value,
       count: quantity.value,
       bought: false,
-      unit: selectedUnitId.value
+      unit: unitObj
     };
-    await updateAll()
+    // console.log(productToAdd);
   }
 
   try {
-    productsStore.addProduct(productToAdd);
+    // productsStore.addProduct(productToAdd);
     await dbService.addProduct(productToAdd);
-    products.value = await dbService.getAllProductsForSelect();
+    await productsStore.loadFromDB();
+    await updateAll();
     resetForm();
-    notify({message: 'Добавлено успешно', color: "success"});
-    // showModal.value = false;
+    notify({message: 'Добавлено успешно', color: 'success'});
   } catch (error) {
     console.error("Ошибка при добавлении продукта:", error);
-    notify({message: 'Ошибка при добавлении продукта'})
+    notify({message: 'Ошибка при добавлении продукта'});
   }
 };
 
@@ -155,6 +161,7 @@ const resetForm = () => {
   newProductName.value = '';
   selectedProductId.value = null;
   quantity.value = 1;
+  selectedUnitId.value = null;
 };
 
 async function updateAll() {
@@ -162,6 +169,17 @@ async function updateAll() {
   units.value = await dbService.getAllUnits();
   // console.log(units.value);
 }
+
+watch(selectedProductId, (newId) => {
+  if (newId) {
+    const product = products.value.find(p => p.id === newId);
+    if (product?.unit) {
+      selectedUnitId.value = product.unit;
+    }
+  } else {
+    selectedUnitId.value = null;
+  }
+});
 
 onMounted(async () => {
   await updateAll();

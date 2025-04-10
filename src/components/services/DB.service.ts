@@ -44,47 +44,58 @@ class DBService {
     if (!this.db) await this.initDB();
 
     return new Promise<IProduct[]>((resolve, reject) => {
-      const transaction = this.db.transaction(
-        [this.storeName, this.secondStoreName],
+      const transaction = this.db?.transaction(
+        [this.storeName, this.secondStoreName, this.unitsStoreName],
         "readonly"
       );
-      const shopList = transaction.objectStore(this.storeName);
-      const productStore = transaction.objectStore(this.secondStoreName);
 
-      const productsRequest = productStore.getAll();
-      const shopItemsRequest = shopList.getAll();
+      const shopList = transaction?.objectStore(this.storeName);
+      const productStore = transaction?.objectStore(this.secondStoreName);
+      const transactionUnits = transaction?.objectStore(this.unitsStoreName);
 
-      productsRequest.onsuccess = () => {
-        const productRecords = productsRequest.result;
+      const productsRequest = productStore?.getAll();
+      const shopItemsRequest = shopList?.getAll();
+      const allUnitsRequest = transactionUnits?.getAll();
 
-        shopItemsRequest.onsuccess = () => {
-          const shopItems = shopItemsRequest.result;
+      const getAllPromise = (request: IDBRequest<any>) =>
+        new Promise<any>((res, rej) => {
+          request.onsuccess = () => res(request.result);
+          request.onerror = () => rej(request.error);
+        });
+      if (!productsRequest || !shopItemsRequest || !allUnitsRequest) {
+        reject()
+      } else
+        Promise.all([
+          getAllPromise(productsRequest),
+          getAllPromise(shopItemsRequest),
+          getAllPromise(allUnitsRequest)
+        ])
+          .then(([productRecords, shopItems, units]) => {
+            if (shopItems.length === 0) {
+              return resolve([]);
+            }
 
-          if (shopItems.length === 0) {
-            return resolve([]);
-          }
+            const products: IProduct[] = productRecords
+              .map(product => {
+                const shopItem = shopItems.find(item => item.id === product.id);
+                return shopItem
+                  ? {
+                    id: product.id,
+                    name: product.name,
+                    count: shopItem.count,
+                    bought: shopItem.bought,
+                    unit: units.find(unit => unit.id === product.unit),
+                  }
+                  : null;
+              })
+              .filter(Boolean) as IProduct[];
 
-          const products: IProduct[] = productRecords
-            .map(product => {
-              const shopItem = shopItems.find(item => item.id === product.id);
-              return shopItem
-                ? {
-                  id: product.id,
-                  name: product.name,
-                  count: shopItem.count,
-                  bought: shopItem.bought
-                }
-                : null;
-            })
-            .filter(Boolean) as IProduct[];
-
-          resolve(products);
-        };
-        shopItemsRequest.onerror = () => reject(shopItemsRequest.error);
-      };
-      productsRequest.onerror = () => reject(productsRequest.error);
+            resolve(products);
+          })
+          .catch(reject);
     });
   }
+
 
   public async getAllProductsForSelect(): Promise<IProduct[]> {
     if (!this.db) await this.initDB();
@@ -101,90 +112,86 @@ class DBService {
 
   public async addProduct(product: IProduct): Promise<void> {
     if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
 
-    return new Promise<void>(async (resolve, reject) => {
-      try {
-        const transaction = this.db.transaction(
-          [this.storeName, this.secondStoreName],
-          "readwrite"
-        );
-        const shopList = transaction.objectStore(this.storeName);
-        const productStore = transaction.objectStore(this.secondStoreName);
+    const productId = product.id && product.id !== 0 ? product.id : Date.now();
+    let existingProduct: IProduct | undefined;
 
-        let productId = product.id && product.id !== 0 ? product.id : Date.now();
-        let existingProduct: IProduct | undefined = undefined;
+    const productTransaction = this.db.transaction([this.secondStoreName], "readwrite");
+    const productStore = productTransaction.objectStore(this.secondStoreName);
 
-        if (!product.id || product.id === 0) {
+    if (!productStore) {
+      throw new Error("Хранилище продуктов не найдено");
+    }
 
-          const request = productStore.getAll();
-          const allProducts = await new Promise<IProduct[]>((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
+    if (!product.id || product.id === 0) {
+      const allProducts: IProduct[] = await new Promise((resolve, reject) => {
+        const request = productStore.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
 
-          existingProduct = allProducts.find(p => p.name === product.name);
-        } else {
-          const request = productStore.get(product.id);
-          existingProduct = await new Promise<IProduct | undefined>((resolve) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => resolve(undefined);
-          });
-        }
+      existingProduct = allProducts.find(p => p.name === product.name);
+    } else {
+      existingProduct = await new Promise<IProduct>((resolve, reject) => {
+        const request = productStore.get(product.id);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
 
-        if (!existingProduct) {
-          await new Promise<void>((res, rej) => {
-            const request = productStore.put({
-              id: productId,
-              name: product.name,
-              unit: product.unit,
-            });
-            request.onsuccess = () => res();
-            request.onerror = () => rej(request.error);
-          });
-        } else {
-          productId = existingProduct.id;
-        }
-
-        const existingShopItem = await new Promise<any>((resolve) => {
-          const request = shopList.get(productId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => resolve(undefined);
+    if (!existingProduct) {
+      await new Promise<void>((resolve, reject) => {
+        const request = productStore.put({
+          id: productId,
+          name: product.name,
+          unit: product.unit?.id,
         });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
 
-        if (existingShopItem) {
-          existingShopItem.count += product.count;
-          existingShopItem.bought = product.bought || existingShopItem.bought;
+    await new Promise<void>((resolve, reject) => {
+      productTransaction.oncomplete = () => resolve();
+      productTransaction.onerror = () => reject(productTransaction.error);
+      productTransaction.onabort = () => reject(productTransaction.error);
+    });
 
-          await new Promise<void>((res, rej) => {
-            const request = shopList.put({
-              id: existingShopItem.id,
-              name: existingShopItem.name,
-              count: existingShopItem.count,
-              bought: existingShopItem.bought,
-            });
-            request.onsuccess = () => res();
-            request.onerror = () => rej(request.error);
-          });
-        } else {
-          await new Promise<void>((res, rej) => {
-            const request = shopList.put({
-              id: productId,
-              name: product.name,
-              count: product.count,
-              bought: product.bought || false
-            });
-            request.onsuccess = () => res();
-            request.onerror = () => rej(request.error);
-          });
-        }
+    const shopTransaction = this.db.transaction([this.storeName], "readwrite");
+    const shopList = shopTransaction.objectStore(this.storeName);
 
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = (event) => reject((event.target as IDBRequest).error);
-      } catch (error) {
-        reject(error);
-      }
+    if (!shopList) throw new Error("Хранилище списка покупок не найдено");
+
+    let existingItem = await new Promise<IProduct>((resolve, reject) => {
+      const request = shopList.get(productId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (!existingItem) {
+      existingItem = {
+        id: productId,
+        name: product.name,
+        count: 0,
+        bought: false,
+      };
+    }
+
+    const newCount = existingItem.count + product.count;
+
+    await new Promise<void>((resolve, reject) => {
+      const request = shopList.put({
+        id: productId,
+        name: product.name,
+        count: newCount,
+        bought: existingItem?.bought ?? product.bought ?? false,
+      });
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
     });
   }
+
 
   public async saveAllProducts(products: IProduct[]): Promise<void> {
     if (!this.db) await this.initDB();
@@ -217,9 +224,7 @@ class DBService {
     return new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(this.secondStoreName, "readwrite");
       const store = transaction.objectStore(this.secondStoreName);
-      console.log("Удаляем продукт с id:", id, "и тип:", typeof id);
       const request = store.delete(id);
-      console.log(request);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });

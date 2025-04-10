@@ -30,8 +30,9 @@ export const useProductsStore = defineStore('products', {
           ...product,
           id: product.id || Date.now()
         });
-      }
 
+        // await dbService.addProduct(product);
+      }
       this.syncWithDB();
     },
 

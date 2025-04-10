@@ -30,6 +30,7 @@ const syncInterval = ref<number>();
 
 onMounted(async () => {
   await productsStore.loadFromDB();
+
   // await dbService.addUnit({id: 2, name: 'кг',})
   // startSyncTimer()
   // if (productsStore.activeProducts.length === 0) {

@@ -1,9 +1,15 @@
 <template>
+  <VaSelect
+      class="ml-4"
+      :options="sortOptions"
+      v-model="selectedSortOption"
+      placement="right"
+  />
   <div class="container">
     <VaOptionList
         class="option-list"
         v-model="selectedProductIds"
-        :options="productsStore.activeProducts"
+        :options="sortedProducts"
         value-by="id"
         :text-by="(product) => getProductText(product)"
         @update:modelValue="handleSelectionChange"
@@ -28,18 +34,25 @@
 </template>
 
 <script lang="ts" setup>
-import {ref, onMounted, watch} from 'vue'
-import {VaButton, VaOptionList, useToast} from "vuestic-ui"
+import {ref, onMounted, watch, computed} from 'vue'
+import {VaButton, VaOptionList, useToast, VaSelect} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
 
 const selectedProductIds = ref<number[]>([])
+const selectedSortOption = ref<string>('По умолчанию')
 const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const toast = useToast()
-const units = ref<Record<number, string>>({})
+
+const sortOptions = [
+  'По умолчанию',
+  "По наименованию",
+  "По количеству",
+  'По дате добавления'
+]
 
 function showDeleteConfirmation() {
   confirmModal.value?.show()
@@ -56,8 +69,7 @@ function deleteAll() {
 }
 
 const getProductText = (product: any) => {
-  const unitName = units.value[product.unit] || 'ед.'
-  return `${product.name} (${product.count} ${unitName})`
+  return `${product.name} (${product.count} ${product.unit.name})`
 }
 
 const handleSelectionChange = (selectedIds: number[]) => {
@@ -85,9 +97,31 @@ onMounted(async () => {
       .filter(p => p.bought)
       .map(p => p.id)
 })
+
+const sortedProducts = computed(() => {
+  let sorted = [...productsStore.activeProducts];
+
+  switch (selectedSortOption.value) {
+    case 'По умолчанию':
+      return sorted;
+    case "По наименованию":
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case "По количеству":
+      sorted.sort((a, b) => a.count - b.count);
+      break;
+    case "По дате добавления":
+      sorted.sort((a, b) => a.id - b.id);
+      break;
+  }
+
+  return sorted;
+})
+
 </script>
 
 <style lang="scss" scoped>
+
 .container {
   margin: 20px;
   display: flex;
@@ -99,9 +133,13 @@ onMounted(async () => {
     word-break: break-all;
   }
 
+  :deep(.va-checkbox--selected) {
+    label {
+      text-decoration: line-through;
+    }
+  }
+
   .btn-container {
-
-
     .button {
       margin-top: 10px;
       width: 170px
