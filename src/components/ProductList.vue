@@ -64,17 +64,17 @@ async function confirmDelete() {
 }
 
 const sortedProducts = computed(() => {
-  let sorted = [...products.value];
+  let result = [...products.value];
 
   switch (selectedSortOption.value) {
     case 'По умолчанию':
-      return sorted;
+      return result;
     case "По наименованию":
-      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      result.sort((a, b) => a.name.localeCompare(b.name));
       break;
   }
 
-  return sorted;
+  return result;
 })
 
 async function deleteOneProduct(id: number) {
