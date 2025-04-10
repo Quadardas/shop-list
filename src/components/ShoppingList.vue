@@ -99,23 +99,23 @@ onMounted(async () => {
 })
 
 const sortedProducts = computed(() => {
-  let sorted = [...productsStore.activeProducts];
+  let result = [...productsStore.activeProducts];
 
   switch (selectedSortOption.value) {
     case 'По умолчанию':
-      return sorted;
+      return result;
     case "По наименованию":
-      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      result.sort((a, b) => a.name.localeCompare(b.name));
       break;
     case "По количеству":
-      sorted.sort((a, b) => a.count - b.count);
+      result.sort((a, b) => a.count - b.count);
       break;
     case "По дате добавления":
-      sorted.sort((a, b) => a.id - b.id);
+      result.sort((a, b) => a.id - b.id);
       break;
   }
 
-  return sorted;
+  return result;
 })
 
 </script>
