@@ -5,7 +5,7 @@
       v-model="selectedSortOption"
       placement="right"
   />
-  <div class="container ">
+  <div class="container ml-4">
     <VaList>
       <VaListItem v-for="product in sortedProducts" :key="product.id">
         <VaListItemSection>

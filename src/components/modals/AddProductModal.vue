@@ -7,7 +7,6 @@
       no-dismiss
       v-model="showModal"
       hideDefaultActions
-      ok-text="Добавить"
       cancel-text="Отмена"
       @cancel="resetForm"
   >
@@ -17,7 +16,6 @@
             v-model="maskedValue"
             placeholder="Введите название нового продукта"
             label="Новый продукт"
-            maxlength="10"
             strict-bind-input-value
             :rules="[(value) => value.length <= 20 || 'Макс. 20 символов']"
         />
@@ -78,6 +76,7 @@ import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
 import type {IUnit} from "@/models/unit.model.ts";
+import {useRoute} from "vue-router";
 
 const {init, notify, close, closeAll} = useToast()
 
@@ -89,6 +88,9 @@ const newProductName = ref('');
 const selectedProductId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
 const productsStore = useProductsStore();
+const listName = ref<string>('')
+const route = useRoute()
+
 const maskedValue = computed({
   get() {
     return newProductName.value
@@ -145,8 +147,9 @@ const handleSubmit = async () => {
 
   try {
     // productsStore.addProduct(productToAdd);
-    await dbService.addProduct(productToAdd);
-    await productsStore.loadFromDB();
+    // await dbService.addProduct(productToAdd);
+    await dbService.addProductToList(productToAdd, +route.params.id);
+    await productsStore.loadFromDB(+route.params.id);
     await updateAll();
     resetForm();
     notify({message: 'Добавлено успешно', color: 'success'});

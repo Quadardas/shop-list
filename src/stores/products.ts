@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 import {dbService} from "@/components/services/DB.service.ts";
 import type {IProduct} from '@/models/product.model';
+import {useRoute} from "vue-router";
 
 export const useProductsStore = defineStore('products', {
   state: () => ({
@@ -9,10 +10,14 @@ export const useProductsStore = defineStore('products', {
   }),
 
   actions: {
-    async loadFromDB() {
+
+    async loadFromDB(listId: number) {
+
       try {
         this.isSyncing = true;
-        this.activeProducts = await dbService.getAllProducts();
+        const list = await dbService.getOneList(listId);
+        this.activeProducts = list.products;
+        console.log(this.activeProducts);
 
       } catch (error) {
         console.error('Ошибка загрузки из DB:', error);

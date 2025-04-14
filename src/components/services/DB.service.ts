@@ -1,6 +1,7 @@
 import type {IProduct} from "@/models/product.model.ts"
 import {useToast} from "vuestic-ui";
 import type {IUnit} from "@/models/unit.model.ts";
+import type {IList} from "@/models/list.model";
 
 
 class DBService {
@@ -9,7 +10,8 @@ class DBService {
   private readonly storeName = "shopList";
   private readonly secondStoreName = "allProducts";
   private readonly unitsStoreName = "units";
-  private readonly dbVersion = 4;
+  private readonly cardList = "cardList";
+  private readonly dbVersion = 5;
 
 
   public async initDB(): Promise<IDBDatabase> {
@@ -26,6 +28,9 @@ class DBService {
         }
         if (!db.objectStoreNames.contains(this.unitsStoreName)) {
           db.createObjectStore(this.unitsStoreName, {keyPath: 'name'});
+        }
+        if (!db.objectStoreNames.contains(this.cardList)) {
+          db.createObjectStore(this.cardList, {keyPath: 'id'});
         }
       };
 
@@ -96,6 +101,51 @@ class DBService {
     });
   }
 
+  public async createList(list: IList): Promise<IList> {
+    if (!this.db) await this.initDB();
+
+    return new Promise<IList>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.cardList, "readwrite");
+      const cardListStore = transaction.objectStore(this.cardList);
+
+      const request = cardListStore.add(list);
+
+      request.onsuccess = () => {
+        resolve(list);
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+    });
+  }
+
+  public async getOneList(listID: number): Promise<IList> {
+    if (!this.db) await this.initDB();
+    return new Promise<IList>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.cardList, "readwrite");
+      const cardListStore = transaction.objectStore(this.cardList);
+      const request = cardListStore.get(listID);
+      request.onsuccess = () => {
+        resolve(request.result);
+      }
+      request.onerror = () => {
+        reject(request.error);
+      }
+    })
+  }
+
+  public async getAllLists(): Promise<IList[]> {
+    if (!this.db) await this.initDB();
+
+    return new Promise<IList[]>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.cardList, "readwrite");
+      const cardListStore = transaction.objectStore(this.cardList);
+      const request = cardListStore.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    })
+  }
 
   public async getAllProductsForSelect(): Promise<IProduct[]> {
     if (!this.db) await this.initDB();
@@ -109,6 +159,59 @@ class DBService {
       request.onerror = () => reject(request.error);
     });
   }
+
+  public async addProductToList(product: IProduct, listId: number): Promise<void> {
+    if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
+
+    const listTransaction = this.db.transaction([this.cardList], "readwrite");
+    const listStore = listTransaction.objectStore(this.cardList);
+
+    const list: IList = await new Promise((resolve, reject) => {
+      const request = listStore.get(listId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    console.log(list)
+    if (!list) throw new Error(`Список с id ${listId} не найден`);
+
+    if (!Array.isArray(list.products)) {
+      list.products = [];
+    }
+
+    const productId = product.id && product.id !== 0 ? product.id : Date.now();
+    const existingProductIndex = list.products.findIndex(p => p.id === productId);
+
+    if (existingProductIndex !== -1) {
+      list.products[existingProductIndex].count += product.count;
+      list.products[existingProductIndex].bought = product.bought ?? false;
+    } else {
+      list.products.push({
+        id: productId,
+        name: product.name,
+        count: product.count,
+        bought: product.bought ?? false,
+        unit: {
+          id: product.unit?.id,
+          name: product.unit?.name,
+        }
+      });
+
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const request = listStore.put(list);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      listTransaction.oncomplete = () => resolve();
+      listTransaction.onerror = () => reject(listTransaction.error);
+      listTransaction.onabort = () => reject(listTransaction.error);
+    });
+  }
+
 
   public async addProduct(product: IProduct): Promise<void> {
     if (!this.db) await this.initDB();
@@ -190,6 +293,36 @@ class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  }
+
+  public async deleteAllProducts(listId: number): Promise<void> {
+    if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
+
+    const transaction = this.db.transaction([this.cardList], "readwrite");
+    const listStore = transaction.objectStore(this.cardList);
+
+    try {
+      const list: any = await new Promise((resolve, reject) => {
+        const request = listStore.get(listId);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      if (!list) {
+        throw new Error(`Список с id ${listId} не найден`);
+      }
+      list.products = [];
+      await new Promise<void>((resolve, reject) => {
+        const request = listStore.put(list);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+
+    } catch (error) {
+      console.error('Ошибка при удалении всех продуктов:', error);
+      throw error;
+    }
   }
 
 
