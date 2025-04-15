@@ -6,14 +6,21 @@
       placement="right"
   />
   <div class="container">
-    <VaOptionList
-        class="option-list"
-        v-model="selectedProductIds"
-        :options="sortedProducts"
-        value-by="id"
-        :text-by="(product) => getProductText(product)"
-        @update:modelValue="handleSelectionChange"
-    />
+    <VaCard>
+      <VaCardTitle v-if="!productsStore.activeProducts.length"> Тут пока пусто</VaCardTitle>
+      <VaCardContent>
+        <VaOptionList
+            class="option-list"
+            v-model="selectedProductIds"
+            :options="sortedProducts"
+            value-by="id"
+            :text-by="(product) => getProductText(product)"
+            @update:modelValue="handleSelectionChange"
+        />
+      </VaCardContent>
+
+    </VaCard>
+
     <div class="btn-container">
       <add-product-modal></add-product-modal>
       <va-button
@@ -35,17 +42,19 @@
 
 <script lang="ts" setup>
 import {ref, onMounted, watch, computed} from 'vue'
-import {VaButton, VaOptionList, useToast, VaSelect} from "vuestic-ui"
+import {VaButton, VaOptionList, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
+import {useRoute} from "vue-router";
 
 const selectedProductIds = ref<number[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
 const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const toast = useToast()
+const route = useRoute()
 
 const sortOptions = [
   'По умолчанию',
@@ -58,10 +67,10 @@ function showDeleteConfirmation() {
   confirmModal.value?.show()
 }
 
-function deleteAll() {
+async function deleteAll() {
   try {
     productsStore.activeProducts = []
-    productsStore.syncWithDB()
+    await dbService.deleteAllProducts(+route.params.id)
     toast.init({message: 'Список очищен', color: 'success'})
   } catch (error) {
     toast.init({message: 'Ошибка при очистке списка', color: 'danger'})
@@ -69,7 +78,8 @@ function deleteAll() {
 }
 
 const getProductText = (product: any) => {
-  return `${product.name} (${product.count} ${product.unit.name})`
+  const unitName = product.unit?.name || 'ед.';
+  return `${product.name} (${product.count} ${unitName})`
 }
 
 const handleSelectionChange = (selectedIds: number[]) => {
@@ -93,6 +103,7 @@ watch(
 )
 
 onMounted(async () => {
+  await productsStore.loadFromDB(+route.params.id)
   selectedProductIds.value = productsStore.activeProducts
       .filter(p => p.bought)
       .map(p => p.id)
@@ -126,6 +137,15 @@ const sortedProducts = computed(() => {
   margin: 20px;
   display: flex;
   justify-content: space-between;
+
+  .va-card {
+    min-width: 40%;
+
+    .va-card-title {
+      font-size: 18px;
+
+    }
+  }
 
   .option-list {
     min-width: 30%;

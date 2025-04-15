@@ -9,10 +9,13 @@ export const useProductsStore = defineStore('products', {
   }),
 
   actions: {
-    async loadFromDB() {
+
+    async loadFromDB(listId: number) {
+
       try {
         this.isSyncing = true;
-        this.activeProducts = await dbService.getAllProducts();
+        const list = await dbService.getOneList(listId);
+        this.activeProducts = list.products;
 
       } catch (error) {
         console.error('Ошибка загрузки из DB:', error);
@@ -30,8 +33,7 @@ export const useProductsStore = defineStore('products', {
           ...product,
           id: product.id || Date.now()
         });
-
-        // await dbService.addProduct(product);
+        
       }
       this.syncWithDB();
     },
