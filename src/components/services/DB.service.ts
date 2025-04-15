@@ -101,17 +101,23 @@ class DBService {
     });
   }
 
-  public async createList(list: IList): Promise<IList> {
+  public async createList(listName: string): Promise<IList> {
     if (!this.db) await this.initDB();
 
     return new Promise<IList>((resolve, reject) => {
       const transaction = this.db!.transaction(this.cardList, "readwrite");
       const cardListStore = transaction.objectStore(this.cardList);
 
-      const request = cardListStore.add(list);
+      const newList = {
+        name: listName,
+        id: Date.now(),
+        products: [],
+        dateCreate: Date.now(),
+      }
+      const request = cardListStore.add(newList);
 
       request.onsuccess = () => {
-        resolve(list);
+        resolve(newList);
       };
 
       request.onerror = () => {
@@ -132,6 +138,23 @@ class DBService {
       request.onerror = () => {
         reject(request.error);
       }
+    })
+  }
+
+  public async deleteList(listID: number): Promise<IList> {
+    if (!this.db) await this.initDB();
+    return new Promise<IList>((resolve, reject) => {
+      const transaction = this.db!.transaction(this.cardList, "readwrite");
+      const cardListStore = transaction.objectStore(this.cardList);
+      const request = cardListStore.delete(listID);
+      request.onsuccess = () => {
+        resolve(request.result);
+
+      }
+      request.onerror = () => {
+        reject(request.error);
+      }
+
     })
   }
 
@@ -172,7 +195,6 @@ class DBService {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    console.log(list)
     if (!list) throw new Error(`Список с id ${listId} не найден`);
 
     if (!Array.isArray(list.products)) {
@@ -353,7 +375,6 @@ class DBService {
 
   public async deleteOneProduct(id: number): Promise<void> {
     if (!this.db) await this.initDB();
-    console.log(id)
     return new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(this.secondStoreName, "readwrite");
       const store = transaction.objectStore(this.secondStoreName);

@@ -7,7 +7,7 @@
   />
   <div class="container">
     <VaCard>
-      <VaCardTitle></VaCardTitle>
+      <VaCardTitle v-if="!productsStore.activeProducts.length"> Тут пока пусто</VaCardTitle>
       <VaCardContent>
         <VaOptionList
             class="option-list"
@@ -18,6 +18,7 @@
             @update:modelValue="handleSelectionChange"
         />
       </VaCardContent>
+
     </VaCard>
 
     <div class="btn-container">
@@ -136,6 +137,15 @@ const sortedProducts = computed(() => {
   margin: 20px;
   display: flex;
   justify-content: space-between;
+
+  .va-card {
+    min-width: 40%;
+
+    .va-card-title {
+      font-size: 18px;
+
+    }
+  }
 
   .option-list {
     min-width: 30%;

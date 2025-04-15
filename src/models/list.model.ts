@@ -4,5 +4,5 @@ export interface IList {
   id: number;
   name: string;
   dateCreate: string;
-  products: IProduct[];
+  products?: IProduct[];
 }

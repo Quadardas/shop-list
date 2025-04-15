@@ -78,7 +78,7 @@ import {useProductsStore} from "@/stores/products.ts";
 import type {IUnit} from "@/models/unit.model.ts";
 import {useRoute} from "vue-router";
 
-const {init, notify, close, closeAll} = useToast()
+const {notify} = useToast()
 
 const showModal = ref(false);
 const products = ref<IProduct[]>([]);
@@ -88,7 +88,6 @@ const newProductName = ref('');
 const selectedProductId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
 const productsStore = useProductsStore();
-const listName = ref<string>('')
 const route = useRoute()
 
 const maskedValue = computed({
@@ -142,13 +141,12 @@ const handleSubmit = async () => {
       bought: false,
       unit: unitObj
     };
-    // console.log(productToAdd);
+
   }
 
   try {
-    // productsStore.addProduct(productToAdd);
-    // await dbService.addProduct(productToAdd);
     await dbService.addProductToList(productToAdd, +route.params.id);
+    await dbService.addProduct(productToAdd);
     await productsStore.loadFromDB(+route.params.id);
     await updateAll();
     resetForm();

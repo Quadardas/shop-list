@@ -1,35 +1,51 @@
 <template>
-  <VaCard v-for="card in cardsList" :key="card.id"
-          @click="goToCard(card.id)"
-  >
-    <VaCardTitle>
-      {{ card.name }}
-    </VaCardTitle>
-    <VaCardContent>
-      Количество товаров: {{ card.products.length }}
-    </VaCardContent>
-  </VaCard>
-  <VaButton
-      class="mt-4 ml-4"
-      @click="createNewList">
-    Создать список
-  </VaButton>
+  <VaSelect
+      class="ml-4 "
+      :options="sortOptions"
+      v-model="selectedSortOption"
+      placement="right"
+  />
+
+  <div class="wrapper ml-4 mt-5">
+    <VaCard
+        v-for="card in sortedProducts" :key="card.id"
+        @click="goToCard(card.id)"
+    >
+      <VaCardTitle>
+        {{ card.name }}
+      </VaCardTitle>
+      <VaCardContent>
+        Количество товаров: {{ card.products.length }}
+      </VaCardContent>
+      <VaButton
+          @click.stop="deleteCard(card.id)"
+          preset="secondary">Удалить
+      </VaButton>
+    </VaCard>
+  </div>
+  <CreateNewListModal
+      @confirm="createNewList"
+  />
 </template>
 <script lang="ts" setup>
-import {VaButton, VaCard, VaCardContent, VaCardTitle} from "vuestic-ui";
+import {VaButton, VaCard, VaCardContent, VaCardTitle, VaSelect} from "vuestic-ui";
 import {useRoute, useRouter} from "vue-router";
-import {onBeforeMount, onMounted, ref} from "vue";
+import {computed, onMounted, ref} from "vue";
 import type {IList} from "@/models/list.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
-import ShoppingList from "@/components/ShoppingList.vue";
-import OneCard from "@/components/OneCard.vue";
 import {useProductsStore} from "@/stores/products.ts";
+import CreateNewListModal from "@/components/modals/CreateNewListModal.vue";
 
 const productsStore = useProductsStore();
-
 const router = useRouter()
 const route = useRoute()
 const cardsList = ref<IList[]>([])
+const selectedSortOption = ref<string>('По умолчанию')
+const sortOptions = [
+  'По умолчанию',
+  "По наименованию",
+  "По дате создания"
+]
 
 function goToCard(id: number) {
   const selectedList = cardsList.value.find(list => list.id === id)
@@ -39,14 +55,54 @@ function goToCard(id: number) {
   }
 }
 
-function createNewList() {
-  console.log('aboba')
+async function createNewList(name: string) {
+  await dbService.createList(name)
+  await updateAll()
+}
+
+async function deleteCard(id: number) {
+  await dbService.deleteList(id)
+  await updateAll()
 }
 
 
-onMounted(async () => {
+async function updateAll() {
   cardsList.value = await dbService.getAllLists()
-  // console.log(cardsList.value)
+}
+
+const sortedProducts = computed(() => {
+  let result = [...cardsList.value];
+
+  switch (selectedSortOption.value) {
+    case 'По умолчанию':
+      return result;
+    case "По наименованию":
+      result.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case "По дате создания":
+      result.sort((a, b) => Number(a.dateCreate) - Number(b.dateCreate));
+      break;
+  }
+
+  return result;
+})
+
+onMounted(async () => {
+  await updateAll()
 })
 
 </script>
+
+<style lang="scss">
+.wrapper {
+  display: flex;
+  gap: 10px;
+
+  .va-card {
+    .va-card-title {
+      font-size: 18px;
+    }
+  }
+}
+
+</style>
