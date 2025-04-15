@@ -12,14 +12,6 @@
   >
     <div class="container">
       <div class="input-container">
-        <VaInput
-            v-model="maskedValue"
-            placeholder="Введите название нового продукта"
-            label="Новый продукт"
-            strict-bind-input-value
-            :rules="[(value) => value.length <= 20 || 'Макс. 20 символов']"
-        />
-
         <VaSelect
             v-model="selectedProductId"
             clearable
@@ -27,7 +19,9 @@
             :options="products"
             value-by="id"
             text-by="name"
-            label="или выберите из списка"
+            label="Продукт"
+            allow-create="unique"
+            @create-new="addNewProduct"
 
         />
       </div>
@@ -111,38 +105,39 @@ const addNewUnit = async (newUnitName: string) => {
   selectedUnitId.value = unitToAdd.id;
 };
 
+const addNewProduct = async (newProductName: string) => {
+  const productToAdd = {
+    id: Date.now(),
+    name: newProductName,
+  };
+
+  await dbService.addProduct(productToAdd);
+  products.value = [...products.value, productToAdd];
+  selectedProductId.value = productToAdd.id;
+};
+
 const handleSubmit = async () => {
-  if (!maskedValue.value && !selectedProductId.value) {
+  const productName = products.value.find(p => p.id === selectedProductId.value)?.name ?? maskedValue.value;
+
+  if (!productName) {
     notify({message: 'Введите название или выберите из списка', color: 'danger'});
     return;
   }
+
   if (selectedUnitId.value == null) {
-    notify({message: 'Введите единицу измерения', color: 'danger'})
+    notify({message: 'Введите единицу измерения', color: 'danger'});
     return;
   }
 
-  let productToAdd: IProduct;
+  const unitObj = units.value.find(u => u.id === selectedUnitId.value);
 
-  if (selectedProductId.value) {
-    const existingProduct = products.value.find(p => p.id === selectedProductId.value);
-    if (!existingProduct) return;
-
-    productToAdd = {
-      ...existingProduct,
-      count: quantity.value,
-    };
-  } else {
-    const unitObj = units.value.find(u => u.id === selectedUnitId.value);
-
-    productToAdd = {
-      id: Date.now(),
-      name: maskedValue.value,
-      count: quantity.value,
-      bought: false,
-      unit: unitObj
-    };
-
-  }
+  const productToAdd: IProduct = {
+    id: selectedProductId.value ?? Date.now(),
+    name: productName,
+    count: quantity.value,
+    bought: false,
+    unit: unitObj
+  };
 
   try {
     await dbService.addProductToList(productToAdd, +route.params.id);
@@ -153,7 +148,7 @@ const handleSubmit = async () => {
     notify({message: 'Добавлено успешно', color: 'success'});
   } catch (error) {
     console.error("Ошибка при добавлении продукта:", error);
-    notify({message: 'Ошибка при добавлении продукта'});
+    notify({message: 'Ошибка при добавлении продукта', color: 'danger'});
   }
 };
 
@@ -166,6 +161,8 @@ const resetForm = () => {
 };
 
 async function updateAll() {
+  // products.value = productsStore.activeProducts;
+  // console.log(products.value);
   products.value = await dbService.getAllProductsForSelect();
   units.value = await dbService.getAllUnits();
   // console.log(units.value);
@@ -175,7 +172,7 @@ watch(selectedProductId, (newId) => {
   if (newId) {
     const product = products.value.find(p => p.id === newId);
     if (product?.unit) {
-      selectedUnitId.value = product.unit;
+      selectedUnitId.value = product.unit.id;
     }
   } else {
     selectedUnitId.value = null;

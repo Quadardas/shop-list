@@ -1,12 +1,18 @@
 <template>
-  <VaSelect
-      class="ml-4 "
-      :options="sortOptions"
-      v-model="selectedSortOption"
-      placement="right"
-  />
+  <div class="header">
+    <CreateNewListModal
+        @confirm="createNewList"
+    />
+    <VaSelect
+        class="ml-4 "
+        :options="sortOptions"
+        v-model="selectedSortOption"
+        placement="right"
+    />
+  </div>
 
-  <div class="wrapper ml-4 mt-5">
+
+  <div class="wrapper ml-4 mt-2">
     <VaCard
         v-for="card in sortedProducts" :key="card.id"
         @click="goToCard(card.id)"
@@ -23,9 +29,7 @@
       </VaButton>
     </VaCard>
   </div>
-  <CreateNewListModal
-      @confirm="createNewList"
-  />
+
 </template>
 <script lang="ts" setup>
 import {VaButton, VaCard, VaCardContent, VaCardTitle, VaSelect} from "vuestic-ui";
@@ -94,8 +98,13 @@ onMounted(async () => {
 </script>
 
 <style lang="scss">
+.header {
+  display: flex;
+}
+
 .wrapper {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 
   .va-card {

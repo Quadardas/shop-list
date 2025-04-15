@@ -16,7 +16,11 @@
             value-by="id"
             :text-by="(product) => getProductText(product)"
             @update:modelValue="handleSelectionChange"
-        />
+        >
+          
+        </VaOptionList>
+
+
       </VaCardContent>
 
     </VaCard>
@@ -42,7 +46,7 @@
 
 <script lang="ts" setup>
 import {ref, onMounted, watch, computed} from 'vue'
-import {VaButton, VaOptionList, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent} from "vuestic-ui"
+import {VaButton, VaOptionList, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent, VaIcon} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";

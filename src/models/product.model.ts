@@ -6,6 +6,6 @@ export interface IProduct {
   name: string;
   count?: number;
   bought?: boolean;
-  unit: IUnit;
+  unit?: IUnit;
 
 }

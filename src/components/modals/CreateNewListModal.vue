@@ -1,6 +1,6 @@
 <template>
   <VaButton @click="showModal = !showModal"
-            class="ml-4 mt-4">
+            class="ml-4 mb-4">
     Добавить список
   </VaButton>
   <VaModal
