@@ -5,6 +5,12 @@
       v-model="selectedSortOption"
       placement="right"
   />
+  <VaSelect
+      class="ml-4"
+      :options="sortType"
+      v-model="selectedSortType"
+      placement="right"
+  />
   <div class="container ml-4">
     <VaList>
       <VaListItem v-for="product in sortedProducts" :key="product.id">
@@ -33,17 +39,23 @@ import {computed, onMounted, ref} from "vue";
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
+import {sortProductStrategies} from "@/utils/sort.ts";
 
 const products = ref<IProduct[]>([]);
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null);
 const toast = useToast();
 const productIdToDelete = ref<number | null>(null);
 const selectedSortOption = ref<string>('По умолчанию')
+const selectedSortType = ref<string>('По убыванию')
 const sortOptions = [
   'По умолчанию',
   "По наименованию",
-
 ]
+const sortType = [
+  "По убыванию",
+  'По возрастанию',
+]
+
 
 function showDeleteConfirmation(id: number) {
   productIdToDelete.value = id;
@@ -64,18 +76,13 @@ async function confirmDelete() {
 }
 
 const sortedProducts = computed(() => {
-  let result = [...products.value];
+  const option = selectedSortOption.value;
+  const type = selectedSortType.value;
+  const productsaboba = products.value; // уже не знаю как их называть)
 
-  switch (selectedSortOption.value) {
-    case 'По умолчанию':
-      return result;
-    case "По наименованию":
-      result.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-  }
-
-  return result;
-})
+  const strategy = sortProductStrategies[option];
+  return strategy ? strategy(productsaboba, type) : products;
+});
 
 async function deleteOneProduct(id: number) {
   await dbService.deleteOneProduct(id);

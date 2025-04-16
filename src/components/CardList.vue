@@ -9,6 +9,12 @@
         v-model="selectedSortOption"
         placement="right"
     />
+    <VaSelect
+        class="ml-4"
+        :options="sortType"
+        v-model="selectedSortType"
+        placement="right"
+    />
   </div>
 
 
@@ -24,10 +30,14 @@
         Количество товаров: {{ card.products.length }}
       </VaCardContent>
       <VaButton
-          @click.stop="deleteCard(card.id)"
+          @click.stop="showDeleteConfirmation(card.id)"
           preset="secondary">Удалить
       </VaButton>
     </VaCard>
+    <confirm-modal
+        ref="confirmModal"
+        @confirm="deleteCard(selectedCardId)"
+    ></confirm-modal>
   </div>
 
 </template>
@@ -39,16 +49,25 @@ import type {IList} from "@/models/list.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
 import CreateNewListModal from "@/components/modals/CreateNewListModal.vue";
+import {sortListStrategies} from "@/utils/sort.ts";
+import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 
 const productsStore = useProductsStore();
 const router = useRouter()
 const route = useRoute()
 const cardsList = ref<IList[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
+const selectedSortType = ref<string>('По убыванию')
+const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
+const selectedCardId = ref<number | null>(null)
 const sortOptions = [
   'По умолчанию',
   "По наименованию",
   "По дате создания"
+]
+const sortType = [
+  "По убыванию",
+  'По возрастанию',
 ]
 
 function goToCard(id: number) {
@@ -64,6 +83,11 @@ async function createNewList(name: string) {
   await updateAll()
 }
 
+function showDeleteConfirmation(id: number) {
+  selectedCardId.value = id
+  confirmModal.value?.show()
+}
+
 async function deleteCard(id: number) {
   await dbService.deleteList(id)
   await updateAll()
@@ -75,21 +99,13 @@ async function updateAll() {
 }
 
 const sortedProducts = computed(() => {
-  let result = [...cardsList.value];
+  const option = selectedSortOption.value;
+  const type = selectedSortType.value;
+  const lists = cardsList.value;
 
-  switch (selectedSortOption.value) {
-    case 'По умолчанию':
-      return result;
-    case "По наименованию":
-      result.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    case "По дате создания":
-      result.sort((a, b) => Number(a.dateCreate) - Number(b.dateCreate));
-      break;
-  }
-
-  return result;
-})
+  const strategy = sortListStrategies[option];
+  return strategy ? strategy(lists, type) : lists;
+});
 
 onMounted(async () => {
   await updateAll()

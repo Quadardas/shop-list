@@ -5,6 +5,12 @@
       v-model="selectedSortOption"
       placement="right"
   />
+  <VaSelect
+      class="ml-4"
+      :options="sortType"
+      v-model="selectedSortType"
+      placement="right"
+  />
   <div class="container">
     <VaCard>
       <VaCardTitle v-if="!productsStore.activeProducts.length"> Тут пока пусто</VaCardTitle>
@@ -17,14 +23,9 @@
             :text-by="(product) => getProductText(product)"
             @update:modelValue="handleSelectionChange"
         >
-          
         </VaOptionList>
-
-
       </VaCardContent>
-
     </VaCard>
-
     <div class="btn-container">
       <add-product-modal></add-product-modal>
       <va-button
@@ -45,16 +46,18 @@
 </template>
 
 <script lang="ts" setup>
-import {ref, onMounted, watch, computed} from 'vue'
+import {ref, onMounted, watch, computed, onBeforeUnmount} from 'vue'
 import {VaButton, VaOptionList, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent, VaIcon} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useRoute} from "vue-router";
+import {sortProductStrategies} from "@/utils/sort.ts";
 
 const selectedProductIds = ref<number[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
+const selectedSortType = ref<string>('По убыванию')
 const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const toast = useToast()
@@ -65,6 +68,10 @@ const sortOptions = [
   "По наименованию",
   "По количеству",
   'По дате добавления'
+]
+const sortType = [
+  "По убыванию",
+  'По возрастанию',
 ]
 
 function showDeleteConfirmation() {
@@ -86,15 +93,19 @@ const getProductText = (product: any) => {
   return `${product.name} (${product.count} ${unitName})`
 }
 
-const handleSelectionChange = (selectedIds: number[]) => {
-  const updatedProducts = productsStore.activeProducts.map(product => ({
-    ...product,
-    bought: selectedIds.includes(product.id)
-  }));
+const handleSelectionChange = async (selectedIds: number[]) => {
+  const listId = +route.params.id;
 
-  productsStore.activeProducts = updatedProducts;
+  for (const product of productsStore.activeProducts) {
+    const shouldBeBought = selectedIds.includes(product.id);
+    if (product.bought !== shouldBeBought) {
+      product.bought = shouldBeBought;
+      await dbService.updateProductBoughtStatus(listId, product.id, shouldBeBought);
+    }
+  }
   productsStore.syncWithDB();
-}
+};
+
 
 watch(
     () => productsStore.activeProducts,
@@ -114,24 +125,14 @@ onMounted(async () => {
 })
 
 const sortedProducts = computed(() => {
-  let result = [...productsStore.activeProducts];
+  const option = selectedSortOption.value;
+  const type = selectedSortType.value;
+  const products = productsStore.activeProducts;
 
-  switch (selectedSortOption.value) {
-    case 'По умолчанию':
-      return result;
-    case "По наименованию":
-      result.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    case "По количеству":
-      result.sort((a, b) => a.count - b.count);
-      break;
-    case "По дате добавления":
-      result.sort((a, b) => a.id - b.id);
-      break;
-  }
+  const strategy = sortProductStrategies[option];
+  return strategy ? strategy(products, type) : products;
+});
 
-  return result;
-})
 
 </script>
 

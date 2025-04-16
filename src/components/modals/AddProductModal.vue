@@ -64,7 +64,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, onMounted, ref, watch} from "vue";
+import {computed, onBeforeMount, onMounted, ref, watch} from "vue";
 import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
@@ -161,9 +161,10 @@ const resetForm = () => {
 };
 
 async function updateAll() {
+  products.value = await dbService.getProductsFromListById(+route.params.id);
   // products.value = productsStore.activeProducts;
-  // console.log(products.value);
-  products.value = await dbService.getAllProductsForSelect();
+  console.log(products.value, route.params.id);
+  // products.value = await dbService.getAllProductsForSelect();
   units.value = await dbService.getAllUnits();
   // console.log(units.value);
 }
@@ -179,8 +180,9 @@ watch(selectedProductId, (newId) => {
   }
 });
 
-onMounted(async () => {
+onBeforeMount(async () => {
   await updateAll();
+
 });
 </script>
 
