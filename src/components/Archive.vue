@@ -1,8 +1,5 @@
 <template>
   <div class="header">
-    <CreateNewListModal
-        @confirm="createNewList"
-    />
     <VaSelect
         class="ml-4 "
         :options="sortOptions"
@@ -17,7 +14,6 @@
     />
   </div>
 
-
   <div class="wrapper ml-4 mt-2">
     <VaCard
         v-for="card in sortedProducts" :key="card.id"
@@ -30,26 +26,18 @@
         Количество товаров: {{ card.products.length }}<br>
         Куплено: {{ card.products.filter(pr => pr.bought == true).length }}
       </VaCardContent>
-      <VaButton
-          @click.stop="showDeleteConfirmation(card.id)"
-          preset="secondary">Удалить
-      </VaButton>
     </VaCard>
-    <confirm-modal
-        ref="confirmModal"
-        @confirm="deleteCard(selectedCardId)"
-    ></confirm-modal>
   </div>
 
 </template>
 <script lang="ts" setup>
-import {VaButton, VaCard, VaCardContent, VaCardTitle, VaSelect} from "vuestic-ui";
+import {VaCard, VaCardContent, VaCardTitle, VaSelect} from "vuestic-ui";
 import {useRoute, useRouter} from "vue-router";
 import {computed, onMounted, ref} from "vue";
 import type {IList} from "@/models/list.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
-import CreateNewListModal from "@/components/modals/CreateNewListModal.vue";
+
 import {sortListStrategies} from "@/utils/sort.ts";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 
@@ -59,7 +47,6 @@ const route = useRoute()
 const cardsList = ref<IList[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
 const selectedSortType = ref<string>('По убыванию')
-const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const selectedCardId = ref<number | null>(null)
 const sortOptions = [
   'По умолчанию',
@@ -75,28 +62,12 @@ function goToCard(id: number) {
   const selectedList = cardsList.value.find(list => list.id === id)
   if (selectedList) {
     productsStore.activeProducts = selectedList.products
-    router.push(`/one-card/${id}`)
+    router.push(`/one-card/${id}?archive=true`)
   }
 }
 
-async function createNewList(name: string) {
-  await dbService.createList(name)
-  await updateAll()
-}
-
-function showDeleteConfirmation(id: number) {
-  selectedCardId.value = id
-  confirmModal.value?.show()
-}
-
-async function deleteCard(id: number) {
-  await dbService.deleteList(id)
-  await updateAll()
-}
-
-
 async function updateAll() {
-  cardsList.value = await dbService.getAllLists()
+  cardsList.value = await dbService.getAllListsFromArchive()
 }
 
 const sortedProducts = computed(() => {

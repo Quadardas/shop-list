@@ -11,6 +11,11 @@
       v-model="selectedSortType"
       placement="right"
   />
+  <VaButton
+      preset="secondary"
+      @click="showDeleteConfirmation"
+  >Удалить все
+  </VaButton>
   <div class="container ml-4">
     <VaList>
       <VaListItem v-for="product in sortedProducts" :key="product.id">
@@ -57,8 +62,10 @@ const sortType = [
 ]
 
 
-function showDeleteConfirmation(id: number) {
-  productIdToDelete.value = id;
+function showDeleteConfirmation(id?: number) {
+  if (id) {
+    productIdToDelete.value = id;
+  }
   confirmModal.value?.show();
 }
 
@@ -86,11 +93,20 @@ const sortedProducts = computed(() => {
 
 async function deleteOneProduct(id: number) {
   await dbService.deleteOneProduct(id);
+  await update()
+}
+
+async function deleteAllProducts() {
+  await dbService.deleteAllProducts();
+  await update()
+}
+
+async function update() {
   products.value = await dbService.getAllProductsForSelect();
 }
 
 onMounted(async () => {
-  products.value = await dbService.getAllProductsForSelect();
+  await update()
 });
 </script>
 

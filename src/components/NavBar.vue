@@ -10,7 +10,10 @@
     </template>
     <template #right>
       <VaNavbarItem class="hidden sm:block">
-        <router-link to="/card-list">Список покупок</router-link>
+        <router-link to="/archive">Завершенные покупки</router-link>
+      </VaNavbarItem>
+      <VaNavbarItem class="hidden sm:block">
+        <router-link to="/card-list">Активные списки</router-link>
       </VaNavbarItem>
       <VaNavbarItem class="hidden sm:block">
         <router-link to="/product-list">Список всех товаров</router-link>

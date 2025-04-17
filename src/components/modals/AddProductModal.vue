@@ -141,7 +141,7 @@ const handleSubmit = async () => {
 
   try {
     await dbService.addProductToList(productToAdd, +route.params.id);
-    await dbService.addProduct(productToAdd);
+    await dbService.addProduct(JSON.parse(JSON.stringify(productToAdd)));
     await productsStore.loadFromDB(+route.params.id);
     await updateAll();
     resetForm();
@@ -161,9 +161,9 @@ const resetForm = () => {
 };
 
 async function updateAll() {
-  products.value = await dbService.getProductsFromListById(+route.params.id);
+  products.value = await dbService.getAllProductsForSelect();
   // products.value = productsStore.activeProducts;
-  console.log(products.value, route.params.id);
+  // console.log(products.value, route.params.id);
   // products.value = await dbService.getAllProductsForSelect();
   units.value = await dbService.getAllUnits();
   // console.log(units.value);

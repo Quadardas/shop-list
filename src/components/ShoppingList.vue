@@ -19,6 +19,7 @@
             class="option-list"
             v-model="selectedProductIds"
             :options="sortedProducts"
+            :disabled-by="(option)=> props.isArchive"
             value-by="id"
             :text-by="(product) => getProductText(product)"
             @update:modelValue="handleSelectionChange"
@@ -26,7 +27,7 @@
         </VaOptionList>
       </VaCardContent>
     </VaCard>
-    <div class="btn-container">
+    <div class="btn-container" v-if="!props.isArchive">
       <add-product-modal></add-product-modal>
       <va-button
           v-if="productsStore.activeProducts.length"
@@ -52,7 +53,7 @@ import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
-import {useRoute} from "vue-router";
+import {useRoute, useRouter} from "vue-router";
 import {sortProductStrategies} from "@/utils/sort.ts";
 
 const selectedProductIds = ref<number[]>([])
@@ -62,6 +63,10 @@ const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const toast = useToast()
 const route = useRoute()
+const router = useRouter()
+const props = defineProps<{
+  isArchive: boolean,
+}>()
 
 const sortOptions = [
   'По умолчанию',
@@ -81,7 +86,7 @@ function showDeleteConfirmation() {
 async function deleteAll() {
   try {
     productsStore.activeProducts = []
-    await dbService.deleteAllProducts(+route.params.id)
+    await dbService.deleteAllProductsFromCard(+route.params.id)
     toast.init({message: 'Список очищен', color: 'success'})
   } catch (error) {
     toast.init({message: 'Ошибка при очистке списка', color: 'danger'})
@@ -113,15 +118,27 @@ watch(
       selectedProductIds.value = newProducts
           .filter(p => p.bought)
           .map(p => p.id)
+      if (selectedProductIds.value.length == productsStore.activeProducts.length && selectedProductIds.value.length > 0 && !props.isArchive) {
+        dbService.addToArchive(+route.params.id)
+        toast.init({message: 'Список будет перенесен в архив', color: 'success'})
+        router.push(`/card-list/`)
+      }
+
     },
+
     {immediate: true, deep: true}
 )
 
 onMounted(async () => {
-  await productsStore.loadFromDB(+route.params.id)
-  selectedProductIds.value = productsStore.activeProducts
-      .filter(p => p.bought)
-      .map(p => p.id)
+  if (props.isArchive) {
+    productsStore.activeProducts = await dbService.getProductsFromListById(+route.params.id, props.isArchive)
+  } else {
+    await productsStore.loadFromDB(+route.params.id)
+    selectedProductIds.value = productsStore.activeProducts
+        .filter(p => p.bought)
+        .map(p => p.id)
+  }
+
 })
 
 const sortedProducts = computed(() => {
