@@ -1,4 +1,10 @@
 <template>
+  <VaInput
+      v-model="searchQuery"
+      class="ml-4"
+      placeholder="Поиск "
+      clearable
+  />
   <VaSelect
       class="ml-4"
       :options="sortOptions"
@@ -52,6 +58,7 @@ const toast = useToast();
 const productIdToDelete = ref<number | null>(null);
 const selectedSortOption = ref<string>('По умолчанию')
 const selectedSortType = ref<string>('По убыванию')
+const searchQuery = ref<string>('');
 const sortOptions = [
   'По умолчанию',
   "По наименованию",
@@ -87,8 +94,12 @@ const sortedProducts = computed(() => {
   const type = selectedSortType.value;
   const productsaboba = products.value; // уже не знаю как их называть)
 
+  const filtered = productsaboba.filter(list =>
+      list.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+
   const strategy = sortProductStrategies[option];
-  return strategy ? strategy(productsaboba, type) : products;
+  return strategy ? strategy(filtered, type) : products;
 });
 
 async function deleteOneProduct(id: number) {

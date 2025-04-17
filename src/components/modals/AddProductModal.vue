@@ -10,56 +10,59 @@
       cancel-text="Отмена"
       @cancel="resetForm"
   >
-    <div class="container">
-      <div class="input-container">
-        <VaSelect
-            v-model="selectedProductId"
-            clearable
-            searchable
-            :options="products"
-            value-by="id"
-            text-by="name"
-            label="Продукт"
-            allow-create="unique"
-            @create-new="addNewProduct"
+    <form
+        @submit.prevent="handleSubmit">
+      <div class="container">
+        <div class="input-container">
+          <VaSelect
+              v-model="selectedProductId"
+              clearable
+              searchable
+              :options="products"
+              value-by="id"
+              text-by="name"
+              label="Продукт"
+              allow-create="unique"
+              @create-new="addNewProduct"
 
-        />
+          />
+        </div>
+        <div class="count-container">
+          <VaCounter
+              v-model="quantity"
+              label="Количество"
+              manual-input
+              :min="1"
+          />
+          <VaSelect
+              v-model="selectedUnitId"
+              label="Единицы измерения"
+              :options="units"
+              value-by="id"
+              text-by="name"
+              allow-create="unique"
+              clearable
+              @create-new="addNewUnit"
+          />
+
+        </div>
+
       </div>
-      <div class="count-container">
-        <VaCounter
-            v-model="quantity"
-            label="Количество"
-            manual-input
-            :min="1"
-        />
-        <VaSelect
-            v-model="selectedUnitId"
-            label="Единицы измерения"
-            :options="units"
-            value-by="id"
-            text-by="name"
-            allow-create="unique"
-            clearable
-            @create-new="addNewUnit"
-        />
-
-      </div>
-
-    </div>
-    <div class="btn-container">
-      <VaButton
-          preset="secondary"
-          @click="()=>{
+      <div class="btn-container">
+        <VaButton
+            preset="secondary"
+            @click="()=>{
             resetForm();
             showModal=false
           }">
-        Отмена
-      </VaButton>
-      <VaButton @click="handleSubmit">
-        Добавить продукты
-      </VaButton>
-    </div>
-
+          Отмена
+        </VaButton>
+        <VaButton
+            @click="handleSubmit">
+          Добавить продукты
+        </VaButton>
+      </div>
+    </form>
   </VaModal>
 </template>
 

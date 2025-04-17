@@ -3,6 +3,12 @@
     <CreateNewListModal
         @confirm="createNewList"
     />
+    <VaInput
+        v-model="searchQuery"
+        class="ml-4"
+        placeholder="Поиск "
+        clearable
+    />
     <VaSelect
         class="ml-4 "
         :options="sortOptions"
@@ -61,6 +67,8 @@ const selectedSortOption = ref<string>('По умолчанию')
 const selectedSortType = ref<string>('По убыванию')
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 const selectedCardId = ref<number | null>(null)
+const searchQuery = ref<string>('');
+
 const sortOptions = [
   'По умолчанию',
   "По наименованию",
@@ -104,8 +112,12 @@ const sortedProducts = computed(() => {
   const type = selectedSortType.value;
   const lists = cardsList.value;
 
+  const filtered = lists.filter(list =>
+      list.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+
   const strategy = sortListStrategies[option];
-  return strategy ? strategy(lists, type) : lists;
+  return strategy ? strategy(filtered, type) : lists;
 });
 
 onMounted(async () => {
@@ -117,6 +129,10 @@ onMounted(async () => {
 <style lang="scss">
 .header {
   display: flex;
+
+  input {
+    height: 80%;
+  }
 }
 
 .wrapper {
