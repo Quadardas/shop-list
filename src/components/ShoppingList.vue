@@ -15,29 +15,50 @@
     <VaCard>
       <VaCardTitle v-if="!productsStore.activeProducts.length"> Тут пока пусто</VaCardTitle>
       <VaCardContent>
-        <VaOptionList
+        <div
             class="option-list"
-            v-model="selectedProductIds"
-            :options="sortedProducts"
-            :disabled-by="(option)=> props.isArchive"
-            value-by="id"
-            :text-by="(product) => getProductText(product)"
-            @update:modelValue="handleSelectionChange"
+            v-for="product in sortedProducts"
+            :key="product.id"
         >
-        </VaOptionList>
+          <VaCheckbox
+              :model-value="selectedProductIds.includes(product.id)"
+              :label="getProductText(product)"
+              :disabled="props.isArchive"
+              @update:modelValue="(checked) => toggleProductSelection(product.id, checked)"
+          />
+          <div class="icon-container">
+            <VaIcon
+                v-if="!props.isArchive"
+                name="edit"
+                @click="editproduct(product)"/>
+            <VaIcon
+                v-if="!props.isArchive"
+                name="delete"
+                @click="deleteProduct(product.id)"/>
+          </div>
+        </div>
       </VaCardContent>
+
     </VaCard>
     <div class="btn-container" v-if="!props.isArchive">
-      <add-product-modal></add-product-modal>
-      <va-button
-          v-if="productsStore.activeProducts.length"
-          class="button"
-          preset="secondary"
-          type="submit"
-          @click="showDeleteConfirmation"
-      >
-        Очистить список
-      </va-button>
+      <add-product-modal
+          ref="addProductModal"
+          :editableProduct="editableProduct"
+          :isEdit="isEdit"
+          @close="isEdit = false"
+      />
+      <div class="btn-container">
+        <va-button @click="openAddProductModal">Добавить продукт</va-button>
+        <va-button
+            v-if="productsStore.activeProducts.length"
+            class="button"
+            preset="secondary"
+            type="submit"
+            @click="showDeleteConfirmation"
+        >
+          Очистить список
+        </va-button>
+      </div>
       <confirm-modal
           ref="confirmModal"
           @confirm="deleteAll"
@@ -55,15 +76,19 @@ import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useRoute, useRouter} from "vue-router";
 import {sortProductStrategies} from "@/utils/sort.ts";
+import type {IProduct} from "@/models/product.model.ts";
 
 const selectedProductIds = ref<number[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
 const selectedSortType = ref<string>('По убыванию')
 const productsStore = useProductsStore()
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
+const addProductModal = ref<InstanceType<typeof AddProductModal> | null>(null);
+const editableProduct = ref<IProduct | null>(null)
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
+const isEdit = ref<boolean>(false)
 const props = defineProps<{
   isArchive: boolean,
 }>()
@@ -78,6 +103,34 @@ const sortType = [
   "По убыванию",
   'По возрастанию',
 ]
+
+const toggleProductSelection = async (productId: number, checked: boolean) => {
+  const listId = +route.params.id;
+  const product = productsStore.activeProducts.find(p => p.id === productId);
+
+  if (product && product.bought !== checked) {
+    product.bought = checked;
+    await dbService.updateProductBoughtStatus(listId, productId, checked);
+    productsStore.syncWithDB();
+  }
+};
+
+function editproduct(product: IProduct) {
+  isEdit.value = true
+  editableProduct.value = JSON.parse(JSON.stringify(product));
+  addProductModal.value?.show();
+}
+
+function openAddProductModal() {
+  isEdit.value = false;
+  editableProduct.value = null;
+  addProductModal.value?.show();
+}
+
+async function deleteProduct(id: number) {
+  await dbService.deleteOneProductFromCard(+route.params.id, id);
+  await productsStore.loadFromDB(+route.params.id)
+}
 
 function showDeleteConfirmation() {
   confirmModal.value?.show()
@@ -97,20 +150,6 @@ const getProductText = (product: any) => {
   const unitName = product.unit?.name || 'ед.';
   return `${product.name} (${product.count} ${unitName})`
 }
-
-const handleSelectionChange = async (selectedIds: number[]) => {
-  const listId = +route.params.id;
-
-  for (const product of productsStore.activeProducts) {
-    const shouldBeBought = selectedIds.includes(product.id);
-    if (product.bought !== shouldBeBought) {
-      product.bought = shouldBeBought;
-      await dbService.updateProductBoughtStatus(listId, product.id, shouldBeBought);
-    }
-  }
-  productsStore.syncWithDB();
-};
-
 
 watch(
     () => productsStore.activeProducts,
@@ -167,12 +206,32 @@ const sortedProducts = computed(() => {
       font-size: 18px;
 
     }
+
+    .va-card__content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
   }
 
   .option-list {
     min-width: 30%;
-    max-width: 70%;
+    
     word-break: break-all;
+    display: flex;
+    justify-content: space-between;
+
+
+    .icon-container {
+      margin-left: 10px;
+      display: flex;
+      gap: 10px;
+
+      .va-icon {
+        cursor: pointer;
+        color: #154EC1;
+      }
+    }
   }
 
   :deep(.va-checkbox--selected) {
@@ -182,6 +241,10 @@ const sortedProducts = computed(() => {
   }
 
   .btn-container {
+    display: flex;
+    max-height: 40px;
+    flex-direction: column;
+
     .button {
       margin-top: 10px;
       width: 170px

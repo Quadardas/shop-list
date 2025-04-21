@@ -17,9 +17,9 @@
       v-model="selectedSortType"
       placement="right"
   />
-  <VaButton
-      preset="secondary"
-      @click="showDeleteConfirmation"
+  <VaButton v-if="sortedProducts"
+            preset="secondary"
+            @click="showDeleteConfirmation()"
   >Удалить все
   </VaButton>
   <div class="container ml-4">
@@ -77,6 +77,7 @@ function showDeleteConfirmation(id?: number) {
 }
 
 async function confirmDelete() {
+  console.log(productIdToDelete.value);
   if (productIdToDelete.value !== null) {
     try {
       await deleteOneProduct(productIdToDelete.value);
@@ -85,6 +86,13 @@ async function confirmDelete() {
       toast.init({message: 'Ошибка при удалении товара', color: 'danger'});
     } finally {
       productIdToDelete.value = null;
+    }
+  } else {
+    try {
+      await deleteAllProducts();
+      toast.init({message: 'Товары удалены', color: 'success'});
+    } catch (error) {
+      toast.init({message: 'Ошибка при удалении товаров', color: 'danger'});
     }
   }
 }

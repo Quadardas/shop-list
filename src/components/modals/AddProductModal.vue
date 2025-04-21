@@ -1,7 +1,4 @@
 <template>
-  <VaButton @click="showModal = !showModal">
-    Добавить продукты
-  </VaButton>
 
   <VaModal
       no-dismiss
@@ -17,6 +14,7 @@
           <VaSelect
               v-model="selectedProductId"
               clearable
+              :maxLength="20"
               searchable
               :options="products"
               value-by="id"
@@ -24,7 +22,6 @@
               label="Продукт"
               allow-create="unique"
               @create-new="addNewProduct"
-
           />
         </div>
         <div class="count-container">
@@ -59,7 +56,7 @@
         </VaButton>
         <VaButton
             @click="handleSubmit">
-          Добавить продукты
+          ОК
         </VaButton>
       </div>
     </form>
@@ -86,6 +83,21 @@ const selectedProductId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
 const productsStore = useProductsStore();
 const route = useRoute()
+const props = defineProps<{
+  editableProduct: IProduct | null;
+  isEdit: boolean;
+}>()
+const emit = defineEmits<{
+  (e: 'close'): void;
+}>();
+
+defineExpose({
+  show: () => showModal.value = true,
+  hide: () => {
+    showModal.value = false;
+    emit('close')
+  }
+})
 
 const maskedValue = computed({
   get() {
@@ -96,11 +108,22 @@ const maskedValue = computed({
   }
 })
 
+function editProduct() {
+  if (!props.editableProduct) return;
 
-const addNewUnit = async (newUnitName: string) => {
+  newProductName.value = props.editableProduct.name;
+  selectedProductId.value = props.editableProduct.id;
+  quantity.value = props.editableProduct.count;
+  selectedUnitId.value = props.editableProduct.unit?.id ?? null;
+
+}
+
+const addNewUnit = async (newUnitNameRaw: string) => {
+  const trimmedName = newUnitNameRaw.slice(0, 20);
+
   const unitToAdd = {
     id: Date.now(),
-    name: newUnitName,
+    name: trimmedName,
   };
 
   await dbService.addUnit(unitToAdd);
@@ -108,10 +131,12 @@ const addNewUnit = async (newUnitName: string) => {
   selectedUnitId.value = unitToAdd.id;
 };
 
-const addNewProduct = async (newProductName: string) => {
+const addNewProduct = async (newProductNameRaw: string) => {
+  const trimmedName = newProductNameRaw.slice(0, 20);
+
   const productToAdd = {
     id: Date.now(),
-    name: newProductName,
+    name: trimmedName,
   };
 
   await dbService.addProduct(productToAdd);
@@ -134,24 +159,33 @@ const handleSubmit = async () => {
 
   const unitObj = units.value.find(u => u.id === selectedUnitId.value);
 
-  const productToAdd: IProduct = {
+  const productToSubmit: IProduct = {
     id: selectedProductId.value ?? Date.now(),
     name: productName,
     count: quantity.value,
     bought: false,
-    unit: unitObj
+    unit: unitObj,
   };
 
   try {
-    await dbService.addProductToList(productToAdd, +route.params.id);
-    await dbService.addProduct(JSON.parse(JSON.stringify(productToAdd)));
-    await productsStore.loadFromDB(+route.params.id);
+    const listId = +route.params.id;
+
+    if (props.isEdit == true) {
+      await dbService.updateProductInList(productToSubmit, listId);
+    } else {
+      await dbService.addProductToList(productToSubmit, listId);
+    }
+
+    await dbService.addProduct(JSON.parse(JSON.stringify(productToSubmit)));
+    await productsStore.loadFromDB(listId);
     await updateAll();
     resetForm();
-    notify({message: 'Добавлено успешно', color: 'success'});
+    notify({message: props.isEdit ? 'Продукт обновлён' : 'Добавлено успешно', color: 'success'});
+
+    showModal.value = false;
   } catch (error) {
-    console.error("Ошибка при добавлении продукта:", error);
-    notify({message: 'Ошибка при добавлении продукта', color: 'danger'});
+    console.error("Ошибка при сохранении продукта:", error);
+    notify({message: 'Ошибка при сохранении продукта', color: 'danger'});
   }
 };
 
@@ -183,9 +217,18 @@ watch(selectedProductId, (newId) => {
   }
 });
 
+watch(() => props.editableProduct, (newProduct) => {
+  if (showModal.value && newProduct) {
+    editProduct();
+  } else if (showModal.value && !newProduct) {
+
+    resetForm();
+
+  }
+});
+
 onBeforeMount(async () => {
   await updateAll();
-
 });
 </script>
 

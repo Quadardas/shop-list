@@ -130,7 +130,7 @@ onMounted(async () => {
 .header {
   display: flex;
 
-  input {
+  .va-input-wrapper {
     height: 80%;
   }
 }

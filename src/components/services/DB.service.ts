@@ -322,6 +322,49 @@ class DBService {
     });
   }
 
+  public async updateProductInList(product: IProduct, listId: number): Promise<void> {
+    if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
+
+    const listTransaction = this.db.transaction([this.cardList], "readwrite");
+    const listStore = listTransaction.objectStore(this.cardList);
+
+    const list: IList = await new Promise((resolve, reject) => {
+      const request = listStore.get(listId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (!list) throw new Error(`Список с id ${listId} не найден`);
+    if (!Array.isArray(list.products)) list.products = [];
+
+    const productIndex = list.products.findIndex(p => p.id === product.id);
+
+    if (productIndex === -1) {
+      throw new Error(`Продукт с id ${product.id} не найден в списке`);
+    }
+
+    list.products[productIndex] = {
+      ...product,
+      unit: {
+        id: product.unit?.id,
+        name: product.unit?.name,
+      },
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const request = listStore.put(list);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      listTransaction.oncomplete = () => resolve();
+      listTransaction.onerror = () => reject(listTransaction.error);
+      listTransaction.onabort = () => reject(listTransaction.error);
+    });
+  }
+
 
   public async updateProductBoughtStatus(listId: number, productId: number, bought: boolean): Promise<void> {
     if (!this.db) await this.initDB();
@@ -431,6 +474,38 @@ class DBService {
     });
   }
 
+
+  public async deleteOneProductFromCard(listId: number, productid: number): Promise<void> {
+    if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
+
+    const transaction = this.db.transaction([this.cardList], "readwrite");
+    const listStore = transaction.objectStore(this.cardList);
+
+    try {
+      const list: IList = await new Promise((resolve, reject) => {
+        const request = listStore.get(listId);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      if (!list) {
+        throw new Error(`Список с id ${listId} не найден`);
+      }
+      list.products = list.products.filter(p => p.id !== productid);
+
+      await new Promise<void>((resolve, reject) => {
+        const request = listStore.put(list);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+
+
+    } catch (error) {
+      console.error('Ошибка при удалении всех продуктов:', error);
+      throw error;
+    }
+  }
 
   public async deleteAllProductsFromCard(listId: number): Promise<void> {
     if (!this.db) await this.initDB();
