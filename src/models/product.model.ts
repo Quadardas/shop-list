@@ -7,5 +7,5 @@ export interface IProduct {
   count?: number;
   bought?: boolean;
   unit?: IUnit;
-
+  categoryId: number;
 }

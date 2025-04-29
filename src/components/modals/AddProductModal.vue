@@ -24,6 +24,13 @@
               @create-new="addNewProduct"
           />
         </div>
+        <VaSelect
+            v-model="selectedCategoryId"
+            :options="categories"
+            value-by="id"
+            text-by="name"
+            clearable
+        />
         <div class="count-container">
           <VaCounter
               v-model="quantity"
@@ -80,6 +87,7 @@ const units = ref<IUnit[]>([]);
 const quantity = ref(1);
 const newProductName = ref('');
 const selectedProductId = ref<number | null>(null);
+const selectedCategoryId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
 const productsStore = useProductsStore();
 const route = useRoute()
@@ -98,6 +106,8 @@ defineExpose({
     emit('close')
   }
 })
+
+const categories = [{id: 1, name: 'aboba'}, {id: 2, name: 'jija'}, {id: 3, name: 'sas'}]
 
 const maskedValue = computed({
   get() {
@@ -137,6 +147,7 @@ const addNewProduct = async (newProductNameRaw: string) => {
   const productToAdd = {
     id: Date.now(),
     name: trimmedName,
+    categoryId: selectedCategoryId.value,
   };
 
   await dbService.addProduct(productToAdd);
@@ -165,6 +176,7 @@ const handleSubmit = async () => {
     count: quantity.value,
     bought: false,
     unit: unitObj,
+    categoryId: selectedCategoryId.value,
   };
 
   try {

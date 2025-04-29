@@ -23,20 +23,28 @@
   >Удалить все
   </VaButton>
   <div class="container ml-4">
-    <VaList>
-      <VaListItem v-for="product in sortedProducts" :key="product.id">
-        <VaListItemSection>
-          <VaListItemLabel>{{ product.name }}</VaListItemLabel>
-          <VaListItemLabel caption>
-            <VaButton
-                preset="secondary"
-                @click="showDeleteConfirmation(product.id)"
-            >Удалить
-            </VaButton>
-          </VaListItemLabel>
-        </VaListItemSection>
-      </VaListItem>
-    </VaList>
+    <VaTreeView
+        :nodes="tree"
+        text-by="name"
+        children-by="children"
+        :expand-all="true"
+    >
+      <template #item="{ item }">
+        <div style="display: flex; align-items: center">
+          <span>{{ item.name }}</span>
+          <VaButton
+              v-if="item.type === 'product'"
+              size="small"
+              color="danger"
+              class="ml-2"
+              @click="showDeleteConfirmation(item.id)"
+          >
+            Удалить
+          </VaButton>
+        </div>
+      </template>
+    </VaTreeView>
+
   </div>
   <confirm-modal
       ref="confirmModal"
@@ -51,7 +59,12 @@ import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {sortProductStrategies} from "@/utils/sort.ts";
+import {buildTree} from '@/utils/treeBuilder.ts'
+import type {TreeNode} from '@/models/tree-node.model.ts'
+import type {ICategory} from '@/models/category.model.ts'
 
+const categories = ref<ICategory[]>([])
+const tree = ref<TreeNode[]>([])
 const products = ref<IProduct[]>([]);
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null);
 const toast = useToast();
@@ -112,20 +125,27 @@ const sortedProducts = computed(() => {
 
 async function deleteOneProduct(id: number) {
   await dbService.deleteOneProduct(id);
-  await update()
+  await loadData()
 }
 
 async function deleteAllProducts() {
   await dbService.deleteAllProducts();
-  await update()
+  await loadData()
 }
 
-async function update() {
-  products.value = await dbService.getAllProductsForSelect();
+// async function update() {
+//   products.value = await dbService.getAllProductsForSelect();
+// }
+async function loadData() {
+  products.value = await dbService.getAllProductsForSelect()
+  categories.value = await dbService.getAllCategories()
+  tree.value = buildTree(categories.value, products.value)
+  console.log(tree.value)
 }
+
 
 onMounted(async () => {
-  await update()
+  await loadData()
 });
 </script>
 

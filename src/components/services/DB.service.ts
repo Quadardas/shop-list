@@ -2,6 +2,7 @@ import type {IProduct} from "@/models/product.model.ts"
 import {useToast} from "vuestic-ui";
 import type {IUnit} from "@/models/unit.model.ts";
 import type {IList} from "@/models/list.model";
+import type {ICategory} from "@/models/category.model.ts";
 
 
 class DBService {
@@ -12,7 +13,8 @@ class DBService {
   private readonly unitsStoreName = "units";
   private readonly cardList = "cardList";
   private readonly archive = "archive";
-  private readonly dbVersion = 8;
+  private readonly categoryList = "categoryList";
+  private readonly dbVersion = 9;
 
 
   public async initDB(): Promise<IDBDatabase> {
@@ -36,6 +38,9 @@ class DBService {
         if (!db.objectStoreNames.contains(this.archive)) {
           db.createObjectStore(this.archive, {keyPath: 'id'});
         }
+        if (!db.objectStoreNames.contains(this.categoryList)) {
+          db.createObjectStore(this.categoryList, {keyPath: 'id'});
+        }
       };
 
       openRequest.onsuccess = () => {
@@ -48,6 +53,73 @@ class DBService {
       };
     });
   }
+
+  async createCategory(name: string, parentId: number | null): Promise<void> {
+    const db = await this.initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this.categoryList, "readwrite");
+      const store = transaction.objectStore(this.categoryList);
+
+      const id = Date.now();
+      const newCategory = {id, name, parentId};
+
+      const request = store.add(newCategory);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async editCategory(id: number, newName: string): Promise<void> {
+    const db = await this.initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this.categoryList, "readwrite");
+      const store = transaction.objectStore(this.categoryList);
+
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const category = getRequest.result;
+        if (!category) return reject(new Error("Category not found"));
+
+        category.name = newName;
+
+        const updateRequest = store.put(category);
+
+        updateRequest.onsuccess = () => resolve();
+        updateRequest.onerror = () => reject(updateRequest.error);
+      };
+
+      getRequest.onerror = () => reject(getRequest.error);
+    });
+  }
+
+  async deleteCategory(id: number): Promise<void> {
+    const db = await this.initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this.categoryList, "readwrite");
+      const store = transaction.objectStore(this.categoryList);
+
+      const request = store.delete(id);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllCategories(): Promise<ICategory[]> {
+    const db = await this.initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(this.categoryList, "readonly");
+      const store = transaction.objectStore(this.categoryList);
+
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
 
   public async getAllProducts(): Promise<IProduct[]> {
     if (!this.db) await this.initDB();
@@ -429,6 +501,7 @@ class DBService {
         id: existingProduct?.id ?? productId,
         name: product.name,
         unit: product.unit,
+        categoryId: product.categoryId,
       });
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
@@ -457,6 +530,7 @@ class DBService {
         name: product.name,
         count: 0,
         bought: false,
+        categoryId: product.categoryId,
       };
     }
 
@@ -468,6 +542,7 @@ class DBService {
         name: product.name,
         count: newCount,
         bought: existingItem?.bought ?? product.bought ?? false,
+        categoryId: product.categoryId,
       });
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
