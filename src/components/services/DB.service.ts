@@ -54,13 +54,13 @@ class DBService {
     });
   }
 
-  async createCategory(name: string, parentId: number | null): Promise<void> {
+  async createCategory(id: number, name: string, parentId: number | null): Promise<void> {
     const db = await this.initDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(this.categoryList, "readwrite");
       const store = transaction.objectStore(this.categoryList);
 
-      const id = Date.now();
+
       const newCategory = {id, name, parentId};
 
       const request = store.add(newCategory);

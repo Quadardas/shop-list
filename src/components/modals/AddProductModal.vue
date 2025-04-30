@@ -25,12 +25,26 @@
           />
         </div>
         <VaSelect
-            v-model="selectedCategoryId"
-            :options="categories"
+            v-model="selectedParentCategoryId"
+            label="Категория"
+            :options="parentCategories"
             value-by="id"
             text-by="name"
             clearable
+            allow-create="unique"
+            @create-new="addNewCategory"
         />
+        <VaSelect
+            v-model="selectedCategoryId"
+            label="Подкатегория"
+            :options="childCategories"
+            value-by="id"
+            text-by="name"
+            clearable
+            allow-create="unique"
+            @create-new="addNewCategory"
+        />
+
         <div class="count-container">
           <VaCounter
               v-model="quantity"
@@ -78,14 +92,17 @@ import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
 import type {IUnit} from "@/models/unit.model.ts";
 import {useRoute} from "vue-router";
+import type {ICategory} from "@/models/category.model.ts";
 
 const {notify} = useToast()
 
 const showModal = ref(false);
 const products = ref<IProduct[]>([]);
+const categories = ref<ICategory[]>([])
 const units = ref<IUnit[]>([]);
 const quantity = ref(1);
 const newProductName = ref('');
+const selectedParentCategoryId = ref<number | null>(null);
 const selectedProductId = ref<number | null>(null);
 const selectedCategoryId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
@@ -107,8 +124,6 @@ defineExpose({
   }
 })
 
-const categories = [{id: 1, name: 'aboba'}, {id: 2, name: 'jija'}, {id: 3, name: 'sas'}]
-
 const maskedValue = computed({
   get() {
     return newProductName.value
@@ -125,8 +140,28 @@ function editProduct() {
   selectedProductId.value = props.editableProduct.id;
   quantity.value = props.editableProduct.count;
   selectedUnitId.value = props.editableProduct.unit?.id ?? null;
-
+  selectedCategoryId.value = props.editableProduct.categoryId ?? null;
 }
+
+const addNewCategory = async (newCategoryNameRaw: string) => {
+  const trimmedName = newCategoryNameRaw.slice(0, 20);
+
+  const newCategory = {
+    id: Date.now(),
+    name: trimmedName,
+    parentId: selectedParentCategoryId.value || null,
+  };
+  try {
+    await dbService.createCategory(newCategory.id, newCategory.name, newCategory.parentId);
+    categories.value.push(newCategory);
+    selectedCategoryId.value = newCategory.id;
+    notify({message: 'Категория добавлена', color: 'success'});
+  } catch (err) {
+    notify({message: 'Ошибка при добавлении категории', color: 'danger'});
+    console.error(err);
+  }
+};
+
 
 const addNewUnit = async (newUnitNameRaw: string) => {
   const trimmedName = newUnitNameRaw.slice(0, 20);
@@ -147,7 +182,7 @@ const addNewProduct = async (newProductNameRaw: string) => {
   const productToAdd = {
     id: Date.now(),
     name: trimmedName,
-    categoryId: selectedCategoryId.value,
+    categoryId: selectedCategoryId.value || selectedParentCategoryId.value,
   };
 
   await dbService.addProduct(productToAdd);
@@ -176,7 +211,7 @@ const handleSubmit = async () => {
     count: quantity.value,
     bought: false,
     unit: unitObj,
-    categoryId: selectedCategoryId.value,
+    categoryId: selectedCategoryId.value || selectedParentCategoryId.value,
   };
 
   try {
@@ -207,10 +242,13 @@ const resetForm = () => {
   selectedProductId.value = null;
   quantity.value = 1;
   selectedUnitId.value = null;
+  selectedCategoryId.value = null;
+  selectedParentCategoryId.value = null;
 };
 
 async function updateAll() {
   products.value = await dbService.getAllProductsForSelect();
+  categories.value = await dbService.getAllCategories()
   // products.value = productsStore.activeProducts;
   // console.log(products.value, route.params.id);
   // products.value = await dbService.getAllProductsForSelect();
@@ -218,11 +256,23 @@ async function updateAll() {
   // console.log(units.value);
 }
 
+const parentCategories = computed(() =>
+    categories.value.filter(category => category.parentId === null)
+);
+
+const childCategories = computed(() =>
+    categories.value.filter(category => category.parentId === selectedParentCategoryId.value)
+);
+
+
 watch(selectedProductId, (newId) => {
   if (newId) {
     const product = products.value.find(p => p.id === newId);
     if (product?.unit) {
       selectedUnitId.value = product.unit.id;
+    }
+    if (product?.categoryId) {
+      selectedCategoryId.value = product.categoryId;
     }
   } else {
     selectedUnitId.value = null;
@@ -237,6 +287,9 @@ watch(() => props.editableProduct, (newProduct) => {
     resetForm();
 
   }
+});
+watch(selectedParentCategoryId, () => {
+  selectedCategoryId.value = null;
 });
 
 onBeforeMount(async () => {
