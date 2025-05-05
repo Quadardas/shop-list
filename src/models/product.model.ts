@@ -8,4 +8,5 @@ export interface IProduct {
   bought?: boolean;
   unit?: IUnit;
   categoryId: number;
+  categoryPath?: string[];
 }

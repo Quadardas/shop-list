@@ -2,7 +2,7 @@
   <VaInput
       v-model="searchQuery"
       class="ml-4"
-      placeholder="Поиск "
+      placeholder="Поиск"
       clearable
   />
   <VaSelect
@@ -17,14 +17,15 @@
       v-model="selectedSortType"
       placement="right"
   />
-  <VaButton v-if="sortedProducts"
-            preset="secondary"
-            @click="showDeleteConfirmation()"
-  >Удалить все
+  <VaButton
+      preset="secondary"
+      @click="showDeleteConfirmation()"
+  >
+    Удалить все
   </VaButton>
   <div class="container ml-4">
     <VaTreeView
-        :nodes="tree"
+        :nodes="sortedTree"
         text-by="name"
         children-by="children"
         :expand-all="true"
@@ -44,43 +45,36 @@
         </div>
       </template>
     </VaTreeView>
-
   </div>
+
   <confirm-modal
       ref="confirmModal"
       @confirm="confirmDelete"
-  ></confirm-modal>
+  />
 </template>
 
 <script lang="ts" setup>
-import {useToast, VaButton, VaList, VaListItem, VaListItemLabel, VaListItemSection, VaSelect} from "vuestic-ui";
-import {computed, onMounted, ref} from "vue";
-import type {IProduct} from "@/models/product.model.ts";
-import {dbService} from "@/components/services/DB.service.ts";
+import {ref, computed, onMounted} from "vue";
+import {useToast, VaButton, VaSelect} from "vuestic-ui";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
+import {dbService} from "@/components/services/DB.service.ts";
 import {sortProductStrategies} from "@/utils/sort.ts";
-import {buildTree} from '@/utils/treeBuilder.ts'
-import type {TreeNode} from '@/models/tree-node.model.ts'
-import type {ICategory} from '@/models/category.model.ts'
+import {buildTree} from "@/utils/treeBuilder.ts";
+import type {IProduct} from "@/models/product.model.ts";
+import type {ICategory} from "@/models/category.model.ts";
+import type {TreeNode} from "@/models/tree-node.model.ts";
 
-const categories = ref<ICategory[]>([])
-const tree = ref<TreeNode[]>([])
+const categories = ref<ICategory[]>([]);
 const products = ref<IProduct[]>([]);
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null);
 const toast = useToast();
 const productIdToDelete = ref<number | null>(null);
-const selectedSortOption = ref<string>('По умолчанию')
-const selectedSortType = ref<string>('По убыванию')
-const searchQuery = ref<string>('');
-const sortOptions = [
-  'По умолчанию',
-  "По наименованию",
-]
-const sortType = [
-  "По убыванию",
-  'По возрастанию',
-]
+const selectedSortOption = ref("По умолчанию");
+const selectedSortType = ref("По убыванию");
+const searchQuery = ref("");
 
+const sortOptions = ["По умолчанию", "По наименованию"];
+const sortType = ["По убыванию", "По возрастанию"];
 
 function showDeleteConfirmation(id?: number) {
   if (id) {
@@ -90,63 +84,72 @@ function showDeleteConfirmation(id?: number) {
 }
 
 async function confirmDelete() {
-  console.log(productIdToDelete.value);
-  if (productIdToDelete.value !== null) {
-    try {
-      await deleteOneProduct(productIdToDelete.value);
-      toast.init({message: 'Товар удалён', color: 'success'});
-    } catch (error) {
-      toast.init({message: 'Ошибка при удалении товара', color: 'danger'});
-    } finally {
-      productIdToDelete.value = null;
+  try {
+    if (productIdToDelete.value !== null) {
+      await dbService.deleteOneProduct(productIdToDelete.value);
+      toast.init({message: "Товар удалён", color: "success"});
+    } else {
+      await dbService.deleteAllProducts();
+      toast.init({message: "Товары удалены", color: "success"});
     }
-  } else {
-    try {
-      await deleteAllProducts();
-      toast.init({message: 'Товары удалены', color: 'success'});
-    } catch (error) {
-      toast.init({message: 'Ошибка при удалении товаров', color: 'danger'});
-    }
+    await loadData();
+  } catch {
+    toast.init({message: "Ошибка при удалении", color: "danger"});
+  } finally {
+    productIdToDelete.value = null;
   }
 }
 
-const sortedProducts = computed(() => {
-  const option = selectedSortOption.value;
-  const type = selectedSortType.value;
-  const productsaboba = products.value; // уже не знаю как их называть)
+function sortTreeRecursively(nodes: TreeNode[], sortBy: string, sortOrder: string): TreeNode[] {
+  const sorted = [...nodes].sort((a, b) => {
+    const aValue = a.name.toLowerCase();
+    const bValue = b.name.toLowerCase();
+    return sortOrder === "По возрастанию"
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+  });
 
-  const filtered = productsaboba.filter(list =>
-      list.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+  for (const node of sorted) {
+    if (node.children) {
+      node.children = sortTreeRecursively(node.children, sortBy, sortOrder);
+    }
+  }
 
-  const strategy = sortProductStrategies[option];
-  return strategy ? strategy(filtered, type) : products;
+  return sorted;
+}
+
+function filterTreeByQuery(nodes: TreeNode[], query: string): TreeNode[] {
+  const lowerQuery = query.toLowerCase();
+
+  const filterRecursive = (node: TreeNode): TreeNode | null => {
+    const nameMatch = node.name.toLowerCase().includes(lowerQuery);
+    const children = node.children?.map(filterRecursive).filter(Boolean) as TreeNode[] | undefined;
+
+    return nameMatch || (children && children.length > 0)
+        ? {...node, children}
+        : null;
+  };
+
+  return nodes.map(filterRecursive).filter((n): n is TreeNode => n !== null);
+}
+
+const sortedTree = computed(() => {
+  const sortBy = selectedSortOption.value;
+  const sortOrder = selectedSortType.value;
+  const baseTree = buildTree(categories.value, products.value);
+  const sorted = sortTreeRecursively(baseTree, sortBy, sortOrder);
+
+  return searchQuery.value.trim()
+      ? filterTreeByQuery(sorted, searchQuery.value.trim())
+      : sorted;
 });
 
-async function deleteOneProduct(id: number) {
-  await dbService.deleteOneProduct(id);
-  await loadData()
-}
-
-async function deleteAllProducts() {
-  await dbService.deleteAllProducts();
-  await loadData()
-}
-
-// async function update() {
-//   products.value = await dbService.getAllProductsForSelect();
-// }
 async function loadData() {
-  products.value = await dbService.getAllProductsForSelect()
-  categories.value = await dbService.getAllCategories()
-  tree.value = buildTree(categories.value, products.value)
-  console.log(tree.value)
+  products.value = await dbService.getAllProductsForSelect();
+  categories.value = await dbService.getAllCategories();
 }
 
-
-onMounted(async () => {
-  await loadData()
-});
+onMounted(loadData);
 </script>
 
 <style lang="scss" scoped>

@@ -13,33 +13,38 @@
   />
   <div class="container">
     <VaCard>
-      <VaCardTitle v-if="!productsStore.activeProducts.length"> Тут пока пусто</VaCardTitle>
+      <VaCardTitle v-if="!productsStore.activeProducts.length">Тут пока пусто</VaCardTitle>
       <VaCardContent>
-        <div
-            class="option-list"
-            v-for="product in sortedProducts"
-            :key="product.id"
-        >
-          <VaCheckbox
-              :model-value="selectedProductIds.includes(product.id)"
-              :label="getProductText(product)"
-              :disabled="props.isArchive"
-              @update:modelValue="(checked) => toggleProductSelection(product.id, checked)"
-          />
-          <div class="icon-container">
-            <VaIcon
-                v-if="!props.isArchive"
-                name="edit"
-                @click="editproduct(product)"/>
-            <VaIcon
-                v-if="!props.isArchive"
-                name="delete"
-                @click="deleteProduct(product.id)"/>
+        <div v-for="category in groupedProducts" :key="category.id">
+          <div class="category-title">{{ category.fullPath }}</div>
+          <div
+              class="option-list"
+              v-for="product in category.products"
+              :key="product.id"
+          >
+            <VaCheckbox
+                :model-value="selectedProductIds.includes(product.id)"
+                :label="product.name + ` (${product.count} ${product.unit?.name || 'ед.'})`"
+                :disabled="props.isArchive"
+                @update:modelValue="(checked) => toggleProductSelection(product.id, checked)"
+            />
+            <div class="icon-container">
+              <VaIcon
+                  v-if="!props.isArchive"
+                  name="edit"
+                  @click="editproduct(product)"
+              />
+              <VaIcon
+                  v-if="!props.isArchive"
+                  name="delete"
+                  @click="deleteProduct(product.id)"
+              />
+            </div>
           </div>
         </div>
       </VaCardContent>
-
     </VaCard>
+
     <div class="btn-container" v-if="!props.isArchive">
       <add-product-modal
           ref="addProductModal"
@@ -68,8 +73,8 @@
 </template>
 
 <script lang="ts" setup>
-import {ref, onMounted, watch, computed, onBeforeUnmount} from 'vue'
-import {VaButton, VaOptionList, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent, VaIcon} from "vuestic-ui"
+import {ref, onMounted, watch, computed, capitalize} from 'vue'
+import {VaButton, useToast, VaSelect, VaCard, VaCardTitle, VaCardContent, VaIcon} from "vuestic-ui"
 import {useProductsStore} from '@/stores/products'
 import AddProductModal from "@/components/modals/AddProductModal.vue";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
@@ -77,18 +82,21 @@ import {dbService} from "@/components/services/DB.service.ts";
 import {useRoute, useRouter} from "vue-router";
 import {sortProductStrategies} from "@/utils/sort.ts";
 import type {IProduct} from "@/models/product.model.ts";
+import type {ICategory} from "@/models/category.model.ts";
 
 const selectedProductIds = ref<number[]>([])
 const selectedSortOption = ref<string>('По умолчанию')
 const selectedSortType = ref<string>('По убыванию')
 const productsStore = useProductsStore()
+const categories = ref<ICategory[]>([])
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
-const addProductModal = ref<InstanceType<typeof AddProductModal> | null>(null);
+const addProductModal = ref<InstanceType<typeof AddProductModal> | null>(null)
 const editableProduct = ref<IProduct | null>(null)
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
 const isEdit = ref<boolean>(false)
+
 const props = defineProps<{
   isArchive: boolean,
 }>()
@@ -99,6 +107,7 @@ const sortOptions = [
   "По количеству",
   'По дате добавления'
 ]
+
 const sortType = [
   "По убыванию",
   'По возрастанию',
@@ -146,27 +155,82 @@ async function deleteAll() {
   }
 }
 
-const getProductText = (product: any) => {
-  const unitName = product.unit?.name || 'ед.';
-  return `${product.name} (${product.count} ${unitName})`
-}
-
 watch(
     () => productsStore.activeProducts,
     (newProducts) => {
       selectedProductIds.value = newProducts
           .filter(p => p.bought)
           .map(p => p.id)
-      if (selectedProductIds.value.length == productsStore.activeProducts.length && selectedProductIds.value.length > 0 && !props.isArchive) {
+      if (selectedProductIds.value.length == productsStore.activeProducts.length &&
+          selectedProductIds.value.length > 0 &&
+          !props.isArchive) {
         dbService.addToArchive(+route.params.id)
         toast.init({message: 'Список будет перенесен в архив', color: 'success'})
         router.push(`/card-list/`)
       }
-
     },
-
     {immediate: true, deep: true}
 )
+
+function getFormattedCategoryPath(categoryId: number): string {
+  const category = categories.value.find(c => c.id === categoryId);
+  if (!category) return '';
+
+  const pathParts: string[] = [capitalize(category.name)];
+  let currentId = category.parentId;
+
+  while (currentId) {
+    const parent = categories.value.find(c => c.id === currentId);
+    if (parent) {
+      pathParts.unshift(capitalize(parent.name));
+      currentId = parent.parentId;
+    } else {
+      currentId = null;
+    }
+  }
+
+  return pathParts.join('. ');
+}
+
+const groupedProducts = computed(() => {
+  const productsByCategory: Record<number, IProduct[]> = {};
+  productsStore.activeProducts.forEach(product => {
+    if (!productsByCategory[product.categoryId]) {
+      productsByCategory[product.categoryId] = [];
+    }
+    productsByCategory[product.categoryId].push(product);
+  });
+
+  const result: Array<{
+    id: number,
+    fullPath: string,
+    products: IProduct[]
+  }> = [];
+
+  Object.keys(productsByCategory).forEach(categoryIdStr => {
+    const categoryId = Number(categoryIdStr);
+    const categoryProducts = productsByCategory[categoryId];
+
+    if (categoryProducts.length > 0) {
+      result.push({
+        id: categoryId,
+        fullPath: getFormattedCategoryPath(categoryId),
+        products: sortProductsInCategory(categoryProducts)
+      });
+    }
+  });
+
+  result.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+
+  return result;
+});
+
+function sortProductsInCategory(products: IProduct[]) {
+  const option = selectedSortOption.value;
+  const type = selectedSortType.value;
+  const strategy = sortProductStrategies[option];
+  return strategy ? strategy(products, type) : products;
+}
 
 onMounted(async () => {
   if (props.isArchive) {
@@ -177,23 +241,11 @@ onMounted(async () => {
         .filter(p => p.bought)
         .map(p => p.id)
   }
-
+  categories.value = await dbService.getAllCategories()
 })
-
-const sortedProducts = computed(() => {
-  const option = selectedSortOption.value;
-  const type = selectedSortType.value;
-  const products = productsStore.activeProducts;
-
-  const strategy = sortProductStrategies[option];
-  return strategy ? strategy(products, type) : products;
-});
-
-
 </script>
 
 <style lang="scss" scoped>
-
 .container {
   margin: 20px;
   display: flex;
@@ -204,7 +256,6 @@ const sortedProducts = computed(() => {
 
     .va-card-title {
       font-size: 18px;
-
     }
 
     .va-card__content {
@@ -214,13 +265,21 @@ const sortedProducts = computed(() => {
     }
   }
 
+  .category-title {
+    font-weight: bold;
+    margin: 15px 0 5px 0;
+    padding: 5px 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+  }
+
   .option-list {
     min-width: 30%;
-    
     word-break: break-all;
     display: flex;
     justify-content: space-between;
-
+    margin-left: 20px;
+    padding: 5px 0;
 
     .icon-container {
       margin-left: 10px;

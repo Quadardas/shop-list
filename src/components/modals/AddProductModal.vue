@@ -16,24 +16,27 @@
               clearable
               :maxLength="20"
               searchable
-              :options="products"
+              :options="groupedProducts"
               value-by="id"
               text-by="name"
+              group-by="group"
               label="Продукт"
               allow-create="unique"
               @create-new="addNewProduct"
           />
+
         </div>
         <VaSelect
             v-model="selectedParentCategoryId"
             label="Категория"
-            :options="parentCategories"
+            :options="categories"
             value-by="id"
             text-by="name"
             clearable
             allow-create="unique"
             @create-new="addNewCategory"
         />
+
         <VaSelect
             v-model="selectedCategoryId"
             label="Подкатегория"
@@ -44,6 +47,7 @@
             allow-create="unique"
             @create-new="addNewCategory"
         />
+
 
         <div class="count-container">
           <VaCounter
@@ -85,7 +89,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, onBeforeMount, onMounted, ref, watch} from "vue";
+import {computed, nextTick, onBeforeMount, onMounted, ref, watch} from "vue";
 import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
@@ -123,6 +127,16 @@ defineExpose({
     emit('close')
   }
 })
+
+const groupedProducts = computed(() => {
+  return products.value.map(product => {
+    const category = categories.value.find(cat => cat.id === product.categoryId);
+    return {
+      ...product,
+      group: category?.name || 'Без категории'
+    };
+  });
+});
 
 const maskedValue = computed({
   get() {
@@ -256,28 +270,45 @@ async function updateAll() {
   // console.log(units.value);
 }
 
-const parentCategories = computed(() =>
-    categories.value.filter(category => category.parentId === null)
-);
+// const parentCategories = computed(() =>
+//     categories.value.filter(category => category.parentId === null)
+// );
 
 const childCategories = computed(() =>
     categories.value.filter(category => category.parentId === selectedParentCategoryId.value)
 );
 
 
-watch(selectedProductId, (newId) => {
+watch(selectedProductId, async (newId) => {
   if (newId) {
     const product = products.value.find(p => p.id === newId);
     if (product?.unit) {
       selectedUnitId.value = product.unit.id;
     }
+
     if (product?.categoryId) {
-      selectedCategoryId.value = product.categoryId;
+      const selectedCategory = categories.value.find(c => c.id === product.categoryId);
+      if (selectedCategory) {
+        if (selectedCategory.parentId === null) {
+          selectedParentCategoryId.value = selectedCategory.id;
+          selectedCategoryId.value = null;
+        } else {
+          selectedParentCategoryId.value = selectedCategory.parentId ?? null;
+          await nextTick();
+          selectedCategoryId.value = selectedCategory.id;
+        }
+      }
+    } else {
+      selectedParentCategoryId.value = null;
+      selectedCategoryId.value = null;
     }
   } else {
     selectedUnitId.value = null;
+    selectedParentCategoryId.value = null;
+    selectedCategoryId.value = null;
   }
 });
+
 
 watch(() => props.editableProduct, (newProduct) => {
   if (showModal.value && newProduct) {

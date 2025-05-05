@@ -376,7 +376,8 @@ class DBService {
         unit: {
           id: product.unit?.id,
           name: product.unit?.name,
-        }
+        },
+        categoryId: product.categoryId
       });
 
     }
