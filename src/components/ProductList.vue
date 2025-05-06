@@ -25,10 +25,11 @@
   </VaButton>
   <div class="container ml-4">
     <VaTreeView
-        :nodes="sortedTree"
+        :key="searchQuery"
+        :nodes="displayTree"
         text-by="name"
-        children-by="children"
-        :expand-all="true"
+        :filter="searchQuery"
+        expand-all
     >
       <template #item="{ item }">
         <div style="display: flex; align-items: center">
@@ -54,8 +55,8 @@
 </template>
 
 <script lang="ts" setup>
-import {ref, computed, onMounted} from "vue";
-import {useToast, VaButton, VaSelect} from "vuestic-ui";
+import {ref, computed, onMounted, watch} from "vue";
+import {useToast, VaButton, VaSelect, VaTreeView} from "vuestic-ui";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
 import {sortProductStrategies} from "@/utils/sort.ts";
@@ -72,6 +73,9 @@ const productIdToDelete = ref<number | null>(null);
 const selectedSortOption = ref("По умолчанию");
 const selectedSortType = ref("По убыванию");
 const searchQuery = ref("");
+const baseTree = ref<TreeNode[]>([]);
+const displayTree = ref<TreeNode[]>([]);
+
 
 const sortOptions = ["По умолчанию", "По наименованию"];
 const sortType = ["По убыванию", "По возрастанию"];
@@ -118,35 +122,15 @@ function sortTreeRecursively(nodes: TreeNode[], sortBy: string, sortOrder: strin
   return sorted;
 }
 
-function filterTreeByQuery(nodes: TreeNode[], query: string): TreeNode[] {
-  const lowerQuery = query.toLowerCase();
-
-  const filterRecursive = (node: TreeNode): TreeNode | null => {
-    const nameMatch = node.name.toLowerCase().includes(lowerQuery);
-    const children = node.children?.map(filterRecursive).filter(Boolean) as TreeNode[] | undefined;
-
-    return nameMatch || (children && children.length > 0)
-        ? {...node, children}
-        : null;
-  };
-
-  return nodes.map(filterRecursive).filter((n): n is TreeNode => n !== null);
-}
-
-const sortedTree = computed(() => {
-  const sortBy = selectedSortOption.value;
-  const sortOrder = selectedSortType.value;
-  const baseTree = buildTree(categories.value, products.value);
-  const sorted = sortTreeRecursively(baseTree, sortBy, sortOrder);
-
-  return searchQuery.value.trim()
-      ? filterTreeByQuery(sorted, searchQuery.value.trim())
-      : sorted;
+watch([selectedSortOption, selectedSortType, baseTree], () => {
+  const cloned = JSON.parse(JSON.stringify(baseTree.value));
+  displayTree.value = sortTreeRecursively(cloned, selectedSortOption.value, selectedSortType.value);
 });
 
 async function loadData() {
   products.value = await dbService.getAllProductsForSelect();
   categories.value = await dbService.getAllCategories();
+  baseTree.value = buildTree(categories.value, products.value);
 }
 
 onMounted(loadData);
