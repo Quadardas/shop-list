@@ -168,7 +168,7 @@ const addNewCategory = async (newCategoryNameRaw: string) => {
   try {
     await dbService.createCategory(newCategory.id, newCategory.name, newCategory.parentId);
     categories.value.push(newCategory);
-    selectedCategoryId.value = newCategory.id;
+    selectedParentCategoryId.value = newCategory.id;
     notify({message: 'Категория добавлена', color: 'success'});
   } catch (err) {
     notify({message: 'Ошибка при добавлении категории', color: 'danger'});
