@@ -26,28 +26,27 @@
           />
 
         </div>
-        <VaSelect
-            v-model="selectedParentCategoryId"
-            label="Категория"
-            :options="categories"
-            value-by="id"
-            text-by="name"
-            clearable
-            allow-create="unique"
-            @create-new="addNewCategory"
-        />
+<!--        <VaSelect-->
+<!--            v-model="selectedParentCategoryId"-->
+<!--            label="Категория"-->
+<!--            :options="categories"-->
+<!--            value-by="id"-->
+<!--            text-by="name"-->
+<!--            clearable-->
+<!--            allow-create="unique"-->
+<!--            @create-new="addNewCategory"-->
+<!--        />-->
 
-        <VaSelect
-            v-model="selectedCategoryId"
-            label="Подкатегория"
-            :options="childCategories"
-            value-by="id"
-            text-by="name"
-            clearable
-            allow-create="unique"
-            @create-new="addNewCategory"
-        />
-
+<!--        <VaSelect-->
+<!--            v-model="selectedCategoryId"-->
+<!--            label="Подкатегория"-->
+<!--            :options="childCategories"-->
+<!--            value-by="id"-->
+<!--            text-by="name"-->
+<!--            clearable-->
+<!--            allow-create="unique"-->
+<!--            @create-new="addNewCategory"-->
+<!--        />-->
 
         <div class="count-container">
           <VaCounter

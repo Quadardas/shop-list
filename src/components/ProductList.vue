@@ -31,20 +31,35 @@
         :filter="searchQuery"
         expand-all
     >
-      <template #item="{ item }">
-        <div style="display: flex; align-items: center">
-          <span>{{ item.name }}</span>
-          <VaButton
-              v-if="item.type === 'product'"
-              size="small"
-              color="danger"
-              class="ml-2"
-              @click="showDeleteConfirmation(item.id)"
-          >
-            Удалить
-          </VaButton>
+      <template #content="{ id, name, type }">
+        <div class="tree-node-row">
+          <span>{{ name }}</span>
+
+          <div class="menu-container">
+            <VaMenu :close-on-content-click="false">
+              <template #anchor>
+                <VaButton
+                    icon="more_vert"
+                    preset="secondary"
+                    class="kebab-button"
+                    size="small"
+                />
+              </template>
+              <div>
+                <div v-if="type === 'category'">
+                  <VaMenuItem @click="addCategory(id)">Добавить категорию</VaMenuItem>
+                  <VaMenuItem @click="addProduct(id)">Добавить продукт</VaMenuItem>
+                </div>
+                <VaMenuItem @click="editItem(id, type)">Редактировать</VaMenuItem>
+                <VaMenuItem @click="showDeleteConfirmation(id)">Удалить</VaMenuItem>
+              </div>
+
+            </VaMenu>
+          </div>
         </div>
       </template>
+
+
     </VaTreeView>
   </div>
 
@@ -79,6 +94,15 @@ const displayTree = ref<TreeNode[]>([]);
 
 const sortOptions = ["По умолчанию", "По наименованию"];
 const sortType = ["По убыванию", "По возрастанию"];
+function addCategory(){
+
+}
+function editItem(id: number){
+
+}
+function addProduct(id: number){
+
+}
 
 function showDeleteConfirmation(id?: number) {
   if (id) {
@@ -143,5 +167,28 @@ onMounted(loadData);
   .va-list-item {
     font-size: 20px;
   }
+  .tree-node-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 8px;
+
+    .menu-container {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    &:hover .menu-container {
+      opacity: 1;
+    }
+
+    .kebab-button {
+      padding: 0;
+      min-width: 32px;
+      width: 32px;
+      height: 32px;
+    }
+  }
+
 }
 </style>
