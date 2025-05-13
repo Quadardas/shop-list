@@ -12,27 +12,28 @@
       <div class="container">
         <div class="input-container">
         </div>
-                <VaSelect
-                    v-model="selectedParentCategoryId"
-                    label="Категория"
-                    :options="categories"
-                    value-by="id"
-                    text-by="name"
-                    clearable
-                    allow-create="unique"
-                    @create-new="addNewCategory"
-                />
+        <VaSelect
+            v-model="selectedParentCategoryId"
+            label="Категория"
+            :options="categories"
+            value-by="id"
+            text-by="name"
+            clearable
+            allow-create="unique"
+            @create-new="addNewCategory"
+        />
 
-                <VaSelect
-                    v-model="selectedCategoryId"
-                    label="Подкатегория"
-                    :options="childCategories"
-                    value-by="id"
-                    text-by="name"
-                    clearable
-                    allow-create="unique"
-                    @create-new="addNewCategory"
-                />
+        <VaSelect
+            v-if="isEdit"
+            v-model="selectedCategoryId"
+            label="Подкатегория"
+            :options="childCategories"
+            value-by="id"
+            text-by="name"
+            clearable
+            allow-create="unique"
+            @create-new="addNewCategory"
+        />
 
       </div>
       <div class="btn-container">
@@ -81,6 +82,7 @@ const route = useRoute()
 const props = defineProps<{
   editableCategory: ICategory | null;
   isEdit: boolean;
+  parentCategoryId: number | null;
 }>()
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -117,7 +119,7 @@ const addNewCategory = async (newCategoryNameRaw: string) => {
   const newCategory = {
     id: Date.now(),
     name: trimmedName,
-    parentId: selectedParentCategoryId.value || null,
+    parentId: props.parentCategoryId || null,
   };
   try {
     await dbService.createCategory(newCategory.id, newCategory.name, newCategory.parentId);
@@ -128,18 +130,32 @@ const addNewCategory = async (newCategoryNameRaw: string) => {
     notify({message: 'Ошибка при добавлении категории', color: 'danger'});
     console.error(err);
   }
+  emit('close');
+  showModal.value = false;
+  resetForm()
 };
 
 const handleSubmit = async () => {
+  const categoryId = selectedCategoryId.value || selectedParentCategoryId.value;
 
-}
+  if (!categoryId) {
+    notify({message: 'Выберите категорию или подкатегорию', color: 'warning'});
+    return;
+  }
 
+  try {
+    notify({message: 'Категория выбрана', color: 'success'});
+
+    emit('close');
+    showModal.value = false;
+    resetForm();
+  } catch (err) {
+    notify({message: 'Ошибка при выборе категории', color: 'danger'});
+    console.error(err);
+  }
+};
 
 const resetForm = () => {
-  newProductName.value = '';
-  selectedProductId.value = null;
-  quantity.value = 1;
-  selectedUnitId.value = null;
   selectedCategoryId.value = null;
   selectedParentCategoryId.value = null;
 };
