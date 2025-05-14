@@ -221,8 +221,8 @@ const groupedProducts = computed(() => {
   });
 
   result.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
-
   return result;
+
 });
 
 function sortProductsInCategory(products: IProduct[]) {

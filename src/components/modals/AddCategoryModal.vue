@@ -1,5 +1,4 @@
 <template>
-
   <VaModal
       no-dismiss
       v-model="showModal"
@@ -7,14 +6,21 @@
       cancel-text="Отмена"
       @cancel="resetForm"
   >
-    <form
-        @submit.prevent="handleSubmit">
+    <form @submit.prevent="handleSubmit">
       <div class="container">
         <div class="input-container">
+          <VaInput
+              v-if="isEdit"
+              v-model="newCategoryName"
+              label="Название категории"
+              :rules="[(v) => !!v || 'Введите название']"
+              maxlength="20"
+          />
         </div>
+
         <VaSelect
             v-model="selectedParentCategoryId"
-            label="Категория"
+            label="Родительская категория"
             :options="categories"
             value-by="id"
             text-by="name"
@@ -23,30 +29,29 @@
             @create-new="addNewCategory"
         />
 
-        <VaSelect
-            v-if="isEdit"
-            v-model="selectedCategoryId"
-            label="Подкатегория"
-            :options="childCategories"
-            value-by="id"
-            text-by="name"
-            clearable
-            allow-create="unique"
-            @create-new="addNewCategory"
-        />
-
+<!--        <VaSelect-->
+<!--            v-if="isEdit"-->
+<!--            v-model="selectedCategoryId"-->
+<!--            label="Подкатегория"-->
+<!--            :options="childCategories"-->
+<!--            value-by="id"-->
+<!--            text-by="name"-->
+<!--            clearable-->
+<!--            allow-create="unique"-->
+<!--            @create-new="addNewCategory"-->
+<!--        />-->
       </div>
+
       <div class="btn-container">
         <VaButton
             preset="secondary"
-            @click="()=>{
-            resetForm();
-            showModal=false
-          }">
+            @click="() => {
+              resetForm();
+              showModal = false;
+            }">
           Отмена
         </VaButton>
-        <VaButton
-            @click="handleSubmit">
+        <VaButton @click="handleSubmit">
           ОК
         </VaButton>
       </div>
@@ -55,63 +60,99 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, nextTick, onBeforeMount, onMounted, ref, watch} from "vue";
-import {useToast, VaButton, VaCounter, VaInput, VaModal, VaSelect} from 'vuestic-ui';
+import {computed, nextTick, onBeforeMount, ref, watch} from "vue";
+import {useToast, VaButton, VaInput, VaModal, VaSelect} from 'vuestic-ui';
 import type {IProduct} from "@/models/product.model.ts";
+import type {IUnit} from "@/models/unit.model.ts";
+import type {ICategory} from "@/models/category.model.ts";
 import {dbService} from "@/components/services/DB.service.ts";
 import {useProductsStore} from "@/stores/products.ts";
-import type {IUnit} from "@/models/unit.model.ts";
 import {useRoute} from "vue-router";
-import type {ICategory} from "@/models/category.model.ts";
 
-const {notify} = useToast()
-
+const {notify} = useToast();
 const showModal = ref(false);
 const products = ref<IProduct[]>([]);
-const categories = ref<ICategory[]>([])
+const categories = ref<ICategory[]>([]);
 const units = ref<IUnit[]>([]);
 const quantity = ref(1);
+
 const newCategoryName = ref('');
-const newSubCategoryName = ref('');
 const selectedParentCategoryId = ref<number | null>(null);
 const selectedProductId = ref<number | null>(null);
 const selectedCategoryId = ref<number | null>(null);
 const selectedUnitId = ref<number | null>(null);
+
 const productsStore = useProductsStore();
-const route = useRoute()
+const route = useRoute();
+
 const props = defineProps<{
   editableCategory: ICategory | null;
   isEdit: boolean;
   parentCategoryId: number | null;
-}>()
+}>();
+
 const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
 defineExpose({
-  show: () => showModal.value = true,
+  show: () => {
+    showModal.value = true;
+    if (props.isEdit && props.editableCategory) {
+      editCategory();
+    } else {
+      resetForm();
+    }
+  },
   hide: () => {
     showModal.value = false;
-    emit('close')
+    emit('close');
   }
-})
+});
 
-const maskedValue = computed({
-  get() {
-    return newCategoryName.value
-  },
-  set(v) {
-    newCategoryName.value = v.slice(0, 20)
+const childCategories = computed(() =>
+    categories.value.filter(category => category.parentId === selectedParentCategoryId.value)
+);
+
+watch(() => props.editableCategory, (newVal) => {
+  if (showModal.value && newVal) {
+    editCategory();
+  } else if (showModal.value && !newVal) {
+    resetForm();
   }
-})
+});
 
-function editCategory() {
+watch(selectedParentCategoryId, () => {
+  if (!props.isEdit) {
+    selectedCategoryId.value = null;
+  }
+});
+
+async function updateAll() {
+  products.value = await dbService.getAllProductsForSelect();
+  categories.value = await dbService.getAllCategories();
+  units.value = await dbService.getAllUnits();
+}
+
+const resetForm = () => {
+  selectedCategoryId.value = null;
+  selectedParentCategoryId.value = null;
+  newCategoryName.value = '';
+};
+
+const editCategory = () => {
   if (!props.editableCategory) return;
 
   newCategoryName.value = props.editableCategory.name;
 
-}
-
+  if (props.editableCategory.parentId === null) {
+    selectedParentCategoryId.value = props.editableCategory.id;
+    selectedCategoryId.value = null;
+  } else {
+    selectedParentCategoryId.value = props.editableCategory.parentId;
+    selectedCategoryId.value = props.editableCategory.id;
+  }
+};
 
 const addNewCategory = async (newCategoryNameRaw: string) => {
   const trimmedName = newCategoryNameRaw.slice(0, 20);
@@ -121,6 +162,7 @@ const addNewCategory = async (newCategoryNameRaw: string) => {
     name: trimmedName,
     parentId: props.parentCategoryId || null,
   };
+
   try {
     await dbService.createCategory(newCategory.id, newCategory.name, newCategory.parentId);
     categories.value.push(newCategory);
@@ -130,9 +172,10 @@ const addNewCategory = async (newCategoryNameRaw: string) => {
     notify({message: 'Ошибка при добавлении категории', color: 'danger'});
     console.error(err);
   }
+
   emit('close');
   showModal.value = false;
-  resetForm()
+  resetForm();
 };
 
 const handleSubmit = async () => {
@@ -143,80 +186,27 @@ const handleSubmit = async () => {
     return;
   }
 
-  try {
-    notify({message: 'Категория выбрана', color: 'success'});
-
-    emit('close');
-    showModal.value = false;
-    resetForm();
-  } catch (err) {
-    notify({message: 'Ошибка при выборе категории', color: 'danger'});
-    console.error(err);
-  }
-};
-
-const resetForm = () => {
-  selectedCategoryId.value = null;
-  selectedParentCategoryId.value = null;
-};
-
-async function updateAll() {
-  products.value = await dbService.getAllProductsForSelect();
-  categories.value = await dbService.getAllCategories()
-  units.value = await dbService.getAllUnits();
-}
-
-// const parentCategories = computed(() =>
-//     categories.value.filter(category => category.parentId === null)
-// );
-
-const childCategories = computed(() =>
-    categories.value.filter(category => category.parentId === selectedParentCategoryId.value)
-);
-
-
-watch(selectedProductId, async (newId) => {
-  if (newId) {
-    const product = products.value.find(p => p.id === newId);
-    if (product?.unit) {
-      selectedUnitId.value = product.unit.id;
-    }
-
-    if (product?.categoryId) {
-      const selectedCategory = categories.value.find(c => c.id === product.categoryId);
-      if (selectedCategory) {
-        if (selectedCategory.parentId === null) {
-          selectedParentCategoryId.value = selectedCategory.id;
-          selectedCategoryId.value = null;
-        } else {
-          selectedParentCategoryId.value = selectedCategory.parentId ?? null;
-          await nextTick();
-          selectedCategoryId.value = selectedCategory.id;
-        }
+  if (props.isEdit && props.editableCategory) {
+    const category = categories.value.find(c => c.id === props.editableCategory?.id);
+    if (category) {
+      category.name = newCategoryName.value.trim().slice(0, 20);
+      category.parentId = selectedParentCategoryId.value ?? null;
+      try {
+        await dbService.editCategory(category.id, category.name, category.parentId);
+        notify({message: 'Категория обновлена', color: 'success'});
+      } catch (err) {
+        notify({message: 'Ошибка при обновлении категории', color: 'danger'});
+        console.error(err);
       }
-    } else {
-      selectedParentCategoryId.value = null;
-      selectedCategoryId.value = null;
     }
   } else {
-    selectedParentCategoryId.value = null;
-    selectedCategoryId.value = null;
+    notify({message: 'Категория выбрана', color: 'success'});
   }
-});
 
-
-watch(() => props.editableCategory, (newProduct) => {
-  if (showModal.value && newProduct) {
-    editProduct();
-  } else if (showModal.value && !newProduct) {
-
-    resetForm();
-
-  }
-});
-watch(selectedParentCategoryId, () => {
-  selectedCategoryId.value = null;
-});
+  emit('close');
+  showModal.value = false;
+  resetForm();
+};
 
 onBeforeMount(async () => {
   await updateAll();
@@ -224,7 +214,6 @@ onBeforeMount(async () => {
 </script>
 
 <style lang="scss" scoped>
-
 .input-container {
   display: flex;
   flex-direction: column;
@@ -236,14 +225,5 @@ onBeforeMount(async () => {
   display: flex;
   margin-top: 10px;
   justify-content: flex-end;
-}
-
-.mb-4 {
-  margin-bottom: 1rem;
-}
-
-.count-container {
-  display: flex;
-  gap: 10px;
 }
 </style>

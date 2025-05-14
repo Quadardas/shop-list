@@ -45,7 +45,7 @@
         :expanded="Array(searchQuery)"
     >
       <template #content="{ id, name, type }">
-        <div class="tree-node-row">
+        <div class="tree-node-row" :class="type">
           <span>{{ name }}</span>
 
           <div class="menu-container">
@@ -75,12 +75,18 @@
   </div>
   <add-category-modal
       ref="addCategoryModal"
-      :editableCategory="editable"
+      :editableCategory="editableCategory"
       :parentCategoryId="parentCategoryId"
       :isEdit="isEdit"
       @close="()=> {isEdit = false, loadData()}"
   />
-
+  <add-product-modal
+      ref="addProductModal"
+      :editableProduct="editableProduct"
+      :categoryId="categoryId"
+      :isEdit="isEdit"
+      @close="()=> {isEdit = false, loadData()}"
+  />
   <confirm-modal
       ref="confirmModal"
       @confirm="confirmDelete"
@@ -92,18 +98,18 @@ import {ref, computed, onMounted, watch} from "vue";
 import {useToast, VaButton, VaSelect, VaTreeView} from "vuestic-ui";
 import ConfirmModal from "@/components/modals/ConfirmModal.vue";
 import {dbService} from "@/components/services/DB.service.ts";
-import {sortProductStrategies} from "@/utils/sort.ts";
 import {buildTree} from "@/utils/treeBuilder.ts";
 import type {IProduct} from "@/models/product.model.ts";
 import type {ICategory} from "@/models/category.model.ts";
 import type {TreeNode} from "@/models/tree-node.model.ts";
 import AddCategoryModal from "@/components/modals/AddCategoryModal.vue";
-
+import AddProductModal from "@/components/modals/AddProductModal.vue";
 
 const categories = ref<ICategory[]>([]);
 const products = ref<IProduct[]>([]);
 const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null);
 const addCategoryModal = ref<InstanceType<typeof AddCategoryModal> | null>(null)
+const addProductModal = ref<InstanceType<typeof AddProductModal> | null>(null)
 const toast = useToast();
 const productIdToDelete = ref<number | null>(null);
 const selectedSortOption = ref("По умолчанию");
@@ -112,31 +118,40 @@ const searchQuery = ref("");
 const baseTree = ref<TreeNode[]>([]);
 const displayTree = ref<TreeNode[]>([]);
 const deleteType = ref<'product' | 'category' | null>(null);
-const editable = ref<ICategory | null>(null)
+const editableCategory = ref<ICategory | null>(null)
 const isEdit = ref<boolean>(false)
 const parentCategoryId = ref<number | null>(null);
+const editableProduct = ref<IProduct | null>(null)
+const categoryId = ref<number | null>(null);
 
 const sortOptions = ["По умолчанию", "По наименованию"];
 const sortType = ["По убыванию", "По возрастанию"];
 
 function addCategory(parentId: number | null) {
   isEdit.value = false;
-  editable.value = null;
+  editableCategory.value = null;
   parentCategoryId.value = parentId;
   addCategoryModal.value?.show();
 
 }
 
-function editItem(id: number) {
+function editItem(id: number, type: string) {
   isEdit.value = true
-  // editable.value = JSON.parse(JSON.stringify());
-  addCategoryModal.value?.show();
+  if (type === "category") {
+    editableCategory.value = categories.value.find(cat => cat.id == id);
+    addCategoryModal.value?.show();
+  }
+  else {
+    editableProduct.value = products.value.find(product => product.id == id);
+    addProductModal.value?.show();
+  }
 }
 
 function addProduct(id: number) {
   isEdit.value = false
+  categoryId.value = id;
   // editable.value = JSON.parse(JSON.stringify());
-  addCategoryModal.value?.show();
+  addProductModal.value?.show();
 }
 
 function showDeleteConfirmation(id?: number, type?: 'product' | 'category') {
@@ -241,6 +256,13 @@ onMounted(loadData);
     align-items: center;
     justify-content: space-between;
     padding-right: 8px;
+
+    &.category {
+      font-weight: 600;
+    }
+    &.product {
+      margin-left: 10px;
+    }
 
     .menu-container {
       opacity: 0;

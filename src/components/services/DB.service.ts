@@ -1,4 +1,4 @@
-import type {IProduct} from "@/models/product.model.ts"
+ import type {IProduct} from "@/models/product.model.ts"
 import {useToast} from "vuestic-ui";
 import type {IUnit} from "@/models/unit.model.ts";
 import type {IList} from "@/models/list.model";
@@ -70,8 +70,9 @@ class DBService {
     });
   }
 
-  async editCategory(id: number, newName: string): Promise<void> {
+  async editCategory(id: number, newName: string, newParentId: number | null): Promise<void> {
     const db = await this.initDB();
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(this.categoryList, "readwrite");
       const store = transaction.objectStore(this.categoryList);
@@ -80,9 +81,14 @@ class DBService {
 
       getRequest.onsuccess = () => {
         const category = getRequest.result;
-        if (!category) return reject(new Error("Category not found"));
 
-        category.name = newName;
+        if (!category) {
+          reject(new Error(`Категория с id ${id} не найдена.`));
+          return;
+        }
+
+        category.name = newName.trim().slice(0, 20);
+        category.parentId = newParentId;
 
         const updateRequest = store.put(category);
 
@@ -93,6 +99,7 @@ class DBService {
       getRequest.onerror = () => reject(getRequest.error);
     });
   }
+
 
   async deleteCategory(id: number): Promise<void> {
     const db = await this.initDB();
@@ -394,6 +401,49 @@ class DBService {
       listTransaction.onabort = () => reject(listTransaction.error);
     });
   }
+
+  public async updateProduct(product: IProduct): Promise<void> {
+    const storeName = "allProducts";
+
+    if (!this.db) await this.initDB();
+    if (!this.db) throw new Error("База данных не инициализирована");
+
+    const tx = this.db.transaction([storeName], "readwrite");
+    const store = tx.objectStore(storeName);
+
+    const existingProduct: IProduct | undefined = await new Promise((resolve, reject) => {
+      const request = store.get(product.id);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (!existingProduct) {
+      throw new Error(`Продукт с id ${product.id} не найден в allProducts`);
+    }
+
+    const updatedProduct: IProduct = {
+      ...existingProduct,
+      name: product.name,
+      unit: {
+        id: product.unit?.id ?? existingProduct.unit?.id,
+        name: product.unit?.name ?? existingProduct.unit?.name,
+      },
+      categoryId: product.categoryId,
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const request = store.put(updatedProduct);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+
 
   public async updateProductInList(product: IProduct, listId: number): Promise<void> {
     if (!this.db) await this.initDB();
